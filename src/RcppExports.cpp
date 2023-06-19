@@ -11,55 +11,48 @@ Rcpp::Rostream<true>&  Rcpp::Rcout = Rcpp::Rcpp_cout_get();
 Rcpp::Rostream<false>& Rcpp::Rcerr = Rcpp::Rcpp_cerr_get();
 #endif
 
-// rcpparma_hello_world
-arma::mat rcpparma_hello_world();
-RcppExport SEXP _matclust_rcpparma_hello_world() {
+// get_ll
+double get_ll(arma::cube x, arma::mat mu, arma::cube sig, int R, int p, arma::uvec cl);
+RcppExport SEXP _matclust_get_ll(SEXP xSEXP, SEXP muSEXP, SEXP sigSEXP, SEXP RSEXP, SEXP pSEXP, SEXP clSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
-    rcpp_result_gen = Rcpp::wrap(rcpparma_hello_world());
+    Rcpp::traits::input_parameter< arma::cube >::type x(xSEXP);
+    Rcpp::traits::input_parameter< arma::mat >::type mu(muSEXP);
+    Rcpp::traits::input_parameter< arma::cube >::type sig(sigSEXP);
+    Rcpp::traits::input_parameter< int >::type R(RSEXP);
+    Rcpp::traits::input_parameter< int >::type p(pSEXP);
+    Rcpp::traits::input_parameter< arma::uvec >::type cl(clSEXP);
+    rcpp_result_gen = Rcpp::wrap(get_ll(x, mu, sig, R, p, cl));
     return rcpp_result_gen;
 END_RCPP
 }
-// rcpparma_outerproduct
-arma::mat rcpparma_outerproduct(const arma::colvec& x);
-RcppExport SEXP _matclust_rcpparma_outerproduct(SEXP xSEXP) {
+// em_step
+List em_step(arma::cube x, arma::mat mu, arma::cube Sigma, arma::mat z, arma::vec pr, arma::uvec cl, arma::cube A, int n, int K, int R, int p, int iter);
+RcppExport SEXP _matclust_em_step(SEXP xSEXP, SEXP muSEXP, SEXP SigmaSEXP, SEXP zSEXP, SEXP prSEXP, SEXP clSEXP, SEXP ASEXP, SEXP nSEXP, SEXP KSEXP, SEXP RSEXP, SEXP pSEXP, SEXP iterSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< const arma::colvec& >::type x(xSEXP);
-    rcpp_result_gen = Rcpp::wrap(rcpparma_outerproduct(x));
-    return rcpp_result_gen;
-END_RCPP
-}
-// rcpparma_innerproduct
-double rcpparma_innerproduct(const arma::colvec& x);
-RcppExport SEXP _matclust_rcpparma_innerproduct(SEXP xSEXP) {
-BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< const arma::colvec& >::type x(xSEXP);
-    rcpp_result_gen = Rcpp::wrap(rcpparma_innerproduct(x));
-    return rcpp_result_gen;
-END_RCPP
-}
-// rcpparma_bothproducts
-Rcpp::List rcpparma_bothproducts(const arma::colvec& x);
-RcppExport SEXP _matclust_rcpparma_bothproducts(SEXP xSEXP) {
-BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< const arma::colvec& >::type x(xSEXP);
-    rcpp_result_gen = Rcpp::wrap(rcpparma_bothproducts(x));
+    Rcpp::traits::input_parameter< arma::cube >::type x(xSEXP);
+    Rcpp::traits::input_parameter< arma::mat >::type mu(muSEXP);
+    Rcpp::traits::input_parameter< arma::cube >::type Sigma(SigmaSEXP);
+    Rcpp::traits::input_parameter< arma::mat >::type z(zSEXP);
+    Rcpp::traits::input_parameter< arma::vec >::type pr(prSEXP);
+    Rcpp::traits::input_parameter< arma::uvec >::type cl(clSEXP);
+    Rcpp::traits::input_parameter< arma::cube >::type A(ASEXP);
+    Rcpp::traits::input_parameter< int >::type n(nSEXP);
+    Rcpp::traits::input_parameter< int >::type K(KSEXP);
+    Rcpp::traits::input_parameter< int >::type R(RSEXP);
+    Rcpp::traits::input_parameter< int >::type p(pSEXP);
+    Rcpp::traits::input_parameter< int >::type iter(iterSEXP);
+    rcpp_result_gen = Rcpp::wrap(em_step(x, mu, Sigma, z, pr, cl, A, n, K, R, p, iter));
     return rcpp_result_gen;
 END_RCPP
 }
 
 static const R_CallMethodDef CallEntries[] = {
-    {"_matclust_rcpparma_hello_world", (DL_FUNC) &_matclust_rcpparma_hello_world, 0},
-    {"_matclust_rcpparma_outerproduct", (DL_FUNC) &_matclust_rcpparma_outerproduct, 1},
-    {"_matclust_rcpparma_innerproduct", (DL_FUNC) &_matclust_rcpparma_innerproduct, 1},
-    {"_matclust_rcpparma_bothproducts", (DL_FUNC) &_matclust_rcpparma_bothproducts, 1},
+    {"_matclust_get_ll", (DL_FUNC) &_matclust_get_ll, 6},
+    {"_matclust_em_step", (DL_FUNC) &_matclust_em_step, 12},
     {NULL, NULL, 0}
 };
 
