@@ -55,10 +55,31 @@ run_em <- function(x, nclusters, iter_max = 100, tol = .001, init = "kmeans") {
   ll <- numeric(iter_max + 1)
   bic <- numeric(iter_max + 1)
   cl <- apply(z, 1, which.max) - 1
-  ll[1] <- get_ll(x, mu, Sigma, R, p, res$cluster - 1)
+  # ll[1] <- get_ll(x, mu, Sigma, R, p, res$cluster - 1)
+  # TODO: bandaid
+  z <- model.matrix(~ 0 + x, data.frame(x = factor(res$cluster))) |> as.data.frame() |> as.matrix()
+  ll[1] <- get_ll(x, mu, Sigma, R, p, z)
+
+  # for testing initialization
+  if (iter_max == 0) {
+    return(
+      list(z = z, pi = pr, mu = mu, Sigma = Sigma)
+    )
+  }
 
   # EM loop
   for (iter in 1:iter_max) {
+
+    if (iter == 1)
+      x[,,i] <- x[,,i] + A[,,i]*matrix(rep(mu[res$cluster[i],], each = nrow(x[,,i])), nrow = nrow(x[,,i]))
+    # need to update z in R precision
+    for (i in 1:n) {
+      # z[i,] <- sapply(1:K, function(k) pr[k] * exp(log_f_k(x[,,i], mu[k,], Sigma[,,k], R, p)))
+      z[i,] <- sapply(1:K, function(k) c(pr)[k] * f_k_r(x[,,i], mu[k,], Sigma[,,k], R, p))
+      z[i,] <- z[i,] / sum(z[i,])
+      # if (i == 986)
+      #   print(round(z[i,], 3))
+    }
 
     params <- em_step(x, mu, Sigma, z, pr, cl, A, n, K, R, p, iter)
 
@@ -67,6 +88,7 @@ run_em <- function(x, nclusters, iter_max = 100, tol = .001, init = "kmeans") {
     z <- params$z
     pr <- params$pr
     cl <- params$cl
+    x <- params$x
 
     ll[iter + 1] <- params$ll
     bic[iter + 1] <- params$bic
@@ -78,6 +100,7 @@ run_em <- function(x, nclusters, iter_max = 100, tol = .001, init = "kmeans") {
   ll <- ll[1:iter + 1]
   bic <- bic[1:iter + 1]
 
+
   # max_ll <- ll[length(ll)]
   # bic <- -2*max_ll + log(n) * (K + K*p + K*p*(p+1)/2)
 
@@ -85,4 +108,10 @@ run_em <- function(x, nclusters, iter_max = 100, tol = .001, init = "kmeans") {
   return(
     list(z = z, pi = pr, mu = mu, Sigma = Sigma, class = as.numeric(cl + 1), ll = ll, bic = bic)
   )
+}
+
+f_k_r <- function(x, mu, sig, R, p) {
+  mu <- matrix(rep(mu, each = R), nrow = R)
+  quad <- (x - mu) %*% solve(sig) %*% t(x - mu)
+  (2*pi)^(-2*R*p) * det(sig)^(-p/2) * exp(-0.5 * sum(diag(quad)))
 }
