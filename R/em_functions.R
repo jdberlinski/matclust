@@ -7,7 +7,7 @@
 #'
 #' @examples
 #' run_em()
-run_em <- function(x, nclusters, iter_max = 100, tol = .001, init = "kmeans") {
+run_em <- function(x, nclusters, iter_max = 101, tol = .001, init = "kmeans") {
   R <- dim(x)[1]
   p <- dim(x)[2]
   n <- dim(x)[3]
@@ -70,16 +70,16 @@ run_em <- function(x, nclusters, iter_max = 100, tol = .001, init = "kmeans") {
   # EM loop
   for (iter in 1:iter_max) {
 
-    if (iter == 1)
-      x[,,i] <- x[,,i] + A[,,i]*matrix(rep(mu[res$cluster[i],], each = nrow(x[,,i])), nrow = nrow(x[,,i]))
-    # need to update z in R precision
-    for (i in 1:n) {
-      # z[i,] <- sapply(1:K, function(k) pr[k] * exp(log_f_k(x[,,i], mu[k,], Sigma[,,k], R, p)))
-      z[i,] <- sapply(1:K, function(k) c(pr)[k] * f_k_r(x[,,i], mu[k,], Sigma[,,k], R, p))
-      z[i,] <- z[i,] / sum(z[i,])
-      # if (i == 986)
-      #   print(round(z[i,], 3))
-    }
+    # if (iter == 1)
+    #   x[,,i] <- x[,,i] + A[,,i]*matrix(rep(mu[res$cluster[i],], each = nrow(x[,,i])), nrow = nrow(x[,,i]))
+    # # need to update z in R precision
+    # for (i in 1:n) {
+    #   # z[i,] <- sapply(1:K, function(k) pr[k] * exp(log_f_k(x[,,i], mu[k,], Sigma[,,k], R, p)))
+    #   z[i,] <- sapply(1:K, function(k) c(pr)[k] * f_k_r(x[,,i], mu[k,], Sigma[,,k], R, p))
+    #   z[i,] <- z[i,] / sum(z[i,])
+    #   # if (i == 986)
+    #   #   print(round(z[i,], 3))
+    # }
 
     params <- em_step(x, mu, Sigma, z, pr, cl, A, n, K, R, p, iter)
 
