@@ -165,12 +165,12 @@ List em_step(
       for (j = 0; j < K; j++) {
         m_k.zeros();
         m_k.each_row() += mu.row(j);
-        x.slice(i).elem(miss) += z(i, j) * (m_k.elem(miss) + S.slice(j).submat(miss, nmiss) * S.slice(j).submat(nmiss, nmiss).i() * (x.slice(i).elem(nmiss) - m_k.elem(nmiss)));
+        x.slice(i).elem(miss) += z(i, j) * (m_k.elem(miss) + S.slice(j).submat(miss, nmiss) * arma::inv_sympd(arma::symmatu(S.slice(j).submat(nmiss, nmiss))) * (x.slice(i).elem(nmiss) - m_k.elem(nmiss)));
       }
 
       // conditional variance of the missing portion of x_i given the observed
       // portion. used to calculate E(X'X) in covariance estimation
-      Phi = S.slice(k).submat(miss, miss) - S.slice(k).submat(miss, nmiss) * S.slice(k).submat(nmiss, nmiss).i() * S.slice(k).submat(nmiss, miss);
+      Phi = S.slice(k).submat(miss, miss) - S.slice(k).submat(miss, nmiss) * arma::inv_sympd(arma::symmatu(S.slice(k).submat(nmiss, nmiss))) * S.slice(k).submat(nmiss, miss);
 
       acc += z(i, k) * arma::mean(x.slice(i), 0);
       diff = x.slice(i) - M;
