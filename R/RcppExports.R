@@ -2,14 +2,14 @@
 # Generator token: 10BE3573-1514-4C36-9D1C-5A225CD40393
 
 get_ll <- function(x, mu, sig, R, p, z) {
-    .Call(`_matclust_get_ll`, x, mu, sig, R, p, z)
+    .Call('_matclust_get_ll', PACKAGE = 'matclust', x, mu, sig, R, p, z)
 }
 
 log_f_k <- function(xi, mu, sig, R, p) {
-    .Call(`_matclust_log_f_k`, xi, mu, sig, R, p)
+    .Call('_matclust_log_f_k', PACKAGE = 'matclust', xi, mu, sig, R, p)
 }
 
 em_step <- function(x, mu, Sigma, z, pr, cl, A, n, K, R, p, iter) {
-    .Call(`_matclust_em_step`, x, mu, Sigma, z, pr, cl, A, n, K, R, p, iter)
+    .Call('_matclust_em_step', PACKAGE = 'matclust', x, mu, Sigma, z, pr, cl, A, n, K, R, p, iter)
 }
 

@@ -69,18 +69,6 @@ run_em <- function(x, nclusters, iter_max = 101, tol = .001, init = "kmeans") {
 
   # EM loop
   for (iter in 1:iter_max) {
-
-    # if (iter == 1)
-    #   x[,,i] <- x[,,i] + A[,,i]*matrix(rep(mu[res$cluster[i],], each = nrow(x[,,i])), nrow = nrow(x[,,i]))
-    # # need to update z in R precision
-    # for (i in 1:n) {
-    #   # z[i,] <- sapply(1:K, function(k) pr[k] * exp(log_f_k(x[,,i], mu[k,], Sigma[,,k], R, p)))
-    #   z[i,] <- sapply(1:K, function(k) c(pr)[k] * f_k_r(x[,,i], mu[k,], Sigma[,,k], R, p))
-    #   z[i,] <- z[i,] / sum(z[i,])
-    #   # if (i == 986)
-    #   #   print(round(z[i,], 3))
-    # }
-
     params <- em_step(x, mu, Sigma, z, pr, cl, A, n, K, R, p, iter)
 
     mu <- params$mu
@@ -93,25 +81,13 @@ run_em <- function(x, nclusters, iter_max = 101, tol = .001, init = "kmeans") {
     ll[iter + 1] <- params$ll
     bic[iter + 1] <- params$bic
 
-    # print((ll[iter + 1] - ll[iter]) / ll[iter])
     if(abs((ll[iter + 1] - ll[iter]) / ll[iter]) < tol)
       break
   }
   ll <- ll[1:iter + 1]
   bic <- bic[1:iter + 1]
-
-
-  # max_ll <- ll[length(ll)]
-  # bic <- -2*max_ll + log(n) * (K + K*p + K*p*(p+1)/2)
-
-  # cl <- apply(z, 1, which.max)
   return(
     list(z = z, pi = pr, mu = mu, Sigma = Sigma, class = as.numeric(cl + 1), ll = ll, bic = bic)
   )
 }
 
-f_k_r <- function(x, mu, sig, R, p) {
-  mu <- matrix(rep(mu, each = R), nrow = R)
-  quad <- (x - mu) %*% solve(sig) %*% t(x - mu)
-  (2*pi)^(-2*R*p) * det(sig)^(-p/2) * exp(-0.5 * sum(diag(quad)))
-}
