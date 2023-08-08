@@ -8,7 +8,6 @@ double get_ll(arma::cube x, arma::mat mu, arma::cube sig, int R, int p, arma::ma
 double log_f_k(arma::mat xi, arma::rowvec mu, arma::mat sig, int R, int p);
 double f_k(arma::mat xi, arma::rowvec mu, arma::mat sig, int R, int p);
 double f(arma::mat xi, arma::vec pr, arma::mat mu, arma::cube sig, int R, int p, int K);
-arma::mat sweep(arma::mat A, arma::vec k);
 arma::mat make_mask(arma::urowvec inds, int ncols);
 List em_step(arma::cube x, arma::mat mu, arma::cube Sigma,  arma::mat z, arma::vec pr, arma::vec cl,
     arma::cube A, int n, int K, int R, int p, int iter);
@@ -79,32 +78,6 @@ double log_f_k(arma::mat xi, arma::rowvec mu, arma::mat sig, int R, int p) {
   return result;
 }
 
-// this might be useful later
-arma::mat sweep(arma::mat A, arma::uvec k) {
-
-  double d, B;
-  int i, j;
-
-  for (int iter1 = 0; iter1 < k.n_elem; iter1++) {
-    i = k(iter1);
-    d = A(i, i);
-    A.row(i) /= d;
-
-    for (int iter2 = 0; iter2 < k.n_elem; iter2++) {
-      if (iter1 == iter2) continue;
-      j = k(iter2);
-      B = A(j, i);
-
-      A.row(j) -= B * A.row(i);
-      A(j, i) = -B / d;
-    }
-
-    A(i, i) = 1.0 / d;
-  }
-
-  return A;
-}
-
 arma::mat make_mask(arma::urowvec inds, int ncols) {
   arma::mat e(inds.n_elem, ncols, arma::fill::zeros);
   for (arma::uword i = 0; i < inds.n_elem; i++)
@@ -134,34 +107,26 @@ List em_step(
   // loop variables
   arma::uword i, j, k;
 
-  // accumulators and work variables
+  // denominator and accumulators for updating mean and covariance
   double den;
   arma::rowvec acc(p, arma::fill::zeros);
   arma::mat sacc(p, p, arma::fill::zeros);
 
   // matrices to be used in EM updates
-  // arma::mat Sigma_i(p, p);
-  arma::mat M(R, p);
-  // arma::mat S(p*R, p*R);
-  // arma::mat Rmat(p*R, p*R);
-  arma::mat Rm;
-  arma::mat Scm;
-  arma::mat ec;
+  arma::mat M(R, p);     // current mean matrix
+  arma::mat m_k(R, p);   // work mean matrix, used for updating condtitional expectations
+  arma::mat ec;          // indicator matrix to extract relevant values for E(X'X)
   arma::mat diff(R, p);
-  arma::uvec miss;
-  arma::uvec nmiss;
-  arma::umat miss_ind;
+  arma::uvec miss;       // index of missing values (column-major)
+  arma::uvec nmiss;      // index of nonmissing values (column-major)
+  arma::umat miss_ind;   // matrix indices of missing values
 
-  arma::mat Phi;
+  arma::mat Phi;         // conditional covariance
 
-  arma::cube Sigma_i(p, p, K);
-  arma::cube S(p*R, p*R, K);
-  arma::cube Rmat(p*R, p*R, K);
-  arma::mat tS(p*R, p*R);
+  arma::cube S(p*R, p*R, K); // covariance matrix of vec(X)
 
-  arma::mat m_k(R, p);
 
-  // constant matrix
+  // constant identity matrix for row covariance
   arma::mat I(R, R, arma::fill::eye);
 
   double ll, bic;
@@ -169,16 +134,15 @@ List em_step(
   // (E step)
   //   update class memebership probabilities,
   //   to be used for caculating conditional expectations
-  //
-  // NOTE: is there a precision problem here?
-  for (i = 0; i < n; i++)
-    for (k = 0; k < K; k++)
+  for (i = 0; i < n; i++) {
+    for (k = 0; k < K; k++) {
       z(i, k) = pr(k) * f_k(x.slice(i), mu.row(k), Sigma.slice(k), R, p);
+      S.slice(k) = arma::kron(Sigma.slice(k), I);
+    }
+  }
+  // NOTE: is there a precision problem here?
 
   z = arma::normalise(z, 1, 1);
-
-  if (iter == 1)
-    cl = arma::index_max(z, 1);
 
   // M step
   for (k = 0; k < K; k++) {
@@ -186,8 +150,6 @@ List em_step(
     sacc.zeros();
     M.zeros();
     M.each_row() += mu.row(k);
-
-    S.slice(k) = arma::kron(Sigma.slice(k), I);
 
     den = arma::sum(z.col(k));
 
@@ -197,37 +159,27 @@ List em_step(
       nmiss = arma::find(A.slice(i) < 0.5);
       miss_ind = arma::ind2sub(size(A.slice(i)), miss);
 
-      // sweep the missing rows of S
-      // Rmat.slice(k) = sweep(S.slice(k), miss);
-      // NOTE:
-      //   I think I should be sweeping the _nonmissing_ rows of S, since that
-      //   will provide the inverse of the (nm, nm) submatrix of S
-      // Rmat.slice(k) = sweep(S.slice(k), nmiss);
+      // impute the missing elements of x_i with their conditional expectations
+      // given the observed elements
       x.slice(i).elem(miss).zeros();
       for (j = 0; j < K; j++) {
-        // TODO:
-        //   rather than calculating this and inverting every time, before
-        //   starting the main iteration of the M step, calculate tS (which is
-        //   stored in cube::S), so in the future we can just sweep the
-        //   nonmissing rows to get the inverse that we need
-        //   the calculation can probably be done when computing the E step
-        tS = arma::kron(Sigma.slice(j), I);
         m_k.zeros();
         m_k.each_row() += mu.row(j);
-        x.slice(i).elem(miss) += z(i, j) * (m_k.elem(miss) + tS.submat(miss, nmiss) * arma::inv_sympd(arma::symmatu(tS.submat(nmiss, nmiss))) * (x.slice(i).elem(nmiss) - m_k.elem(nmiss)));
+        x.slice(i).elem(miss) += z(i, j) * (m_k.elem(miss) + S.slice(j).submat(miss, nmiss) * arma::inv_sympd(arma::symmatu(S.slice(j).submat(nmiss, nmiss))) * (x.slice(i).elem(nmiss) - m_k.elem(nmiss)));
       }
 
-      // Rm = Rmat.slice(k).submat(miss, miss);
-      // Scm = Sigma_i.slice(k).submat(miss_ind.row(1), miss_ind.row(1));
-
+      // conditional variance of the missing portion of x_i given the observed
+      // portion. used to calculate E(X'X) in covariance estimation
       Phi = S.slice(k).submat(miss, miss) - S.slice(k).submat(miss, nmiss) * S.slice(k).submat(nmiss, nmiss).i() * S.slice(k).submat(nmiss, miss);
 
       acc += z(i, k) * arma::mean(x.slice(i), 0);
       diff = x.slice(i) - M;
 
+      // covariance update requires the conditional variance to be added in
+      // places corresponding to two missing values (if there are any missing
+      // values)
       if (!miss.is_empty()) {
         ec = make_mask(miss_ind.row(1), p);
-        // sacc += z(i, k) * (diff.t() * diff + ec.t() * (Rm * Scm) * ec);
         sacc += z(i, k) * (diff.t() * diff + ec.t() * Phi * ec);
       } else {
         sacc += z(i, k) * diff.t() * diff;
@@ -239,18 +191,20 @@ List em_step(
     pr(k) = den / n;
   }
 
+  // assign "hard" clusters
   cl = arma::index_max(z, 1);
 
-  // ll = get_ll(x, mu, Sigma, R, p, cl);
   ll = get_ll(x, mu, Sigma, R, p, z);
   bic = -2 * ll + log(n) * (K + K*p + K*p*(p + 1)/2);
 
-  return List::create(Named("x") = x,
-                      Named("mu") = mu,
-                      Named("Sigma") = Sigma,
-                      Named("z") = z,
-                      Named("pr") = pr,
-                      Named("cl") = cl,
-                      Named("ll") = ll,
-                      Named("bic") = bic);
+  return List::create(
+      Named("x") = x,
+      Named("mu") = mu,
+      Named("Sigma") = Sigma,
+      Named("z") = z,
+      Named("pr") = pr,
+      Named("cl") = cl,
+      Named("ll") = ll,
+      Named("bic") = bic
+  );
 }
