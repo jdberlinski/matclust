@@ -80,7 +80,7 @@ generate_data <- function(n, K, p, gom, min_reps = 1, max_reps = 6, int = c(-5, 
     }
   )
   X <- array(unlist(X), dim = c(R, p, n))
-  X <- list(data = X, class = cl)
+  X <- list(data = X, class = cl, params = list(Mu = params$Mu, S = params$S))
 
   return(X)
 }
