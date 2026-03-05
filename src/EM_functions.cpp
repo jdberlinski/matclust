@@ -19,23 +19,19 @@ List em_step(arma::cube x, arma::mat mu, arma::cube Sigma,  arma::mat z, arma::v
 //' @export
 // [[Rcpp::export]]
 double get_ll(arma::cube x, arma::mat mu, arma::cube sig, int R, int p, arma::mat z) {
-
-  // TODO: this should probably include the class probabilities?
   arma::uword n = x.n_slices;
   double ll = 0.0;
+ 
+  // Uncomment the next 4 lines for the alternative calculation. Necessary on occasion for precesion when calculating LL or BIC
+  // for (arma::uword i = 0; i < n; i++) {
+  //   int ind_max = z.row(i).index_max();
+  //   ll += log_f_k(x.slice(i), mu.row(ind_max), sig.slice(ind_max), R, p);
+  // }
 
-  // Uncomment this part to use the alternative calculation
-  for (arma::uword i = 0; i < n; i++) {
-    int ind_max = z.row(i).index_max();
-    ll += log_f_k(x.slice(i), mu.row(ind_max), sig.slice(ind_max), R, p);
-  }
-
-  // this is a bandaid :)
-  // for (arma::uword i = 0; i < n; i++)
-  //   ll += log(f(x.slice(i), arma::conv_to<arma::colvec>::from(z.row(i)), mu, sig, R, p, sig.n_slices));
-
-  // // NOTE: see below, dealing with precision
-  // ll += n * log(pow(2.0 * M_PI, -2*R*p));
+  // Comment the next 3 lines for alternative calculation
+  for (arma::uword i = 0; i < n; i++)
+    ll += log(f(x.slice(i), arma::conv_to<arma::colvec>::from(z.row(i)), mu, sig, R, p, sig.n_slices));
+  ll += n * log(pow(2.0 * M_PI, -2*R*p)); // for precision. 
 
   return ll;
 }
