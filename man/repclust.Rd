@@ -2,7 +2,7 @@
 % Please edit documentation in R/em_functions.R
 \name{repclust}
 \alias{repclust}
-\title{repclust}
+\title{Gaussian mixture models for replicated data}
 \usage{
 repclust(
   x,
@@ -15,12 +15,83 @@ repclust(
     10)
 )
 }
+\arguments{
+\item{x}{The array of data to be clustered. Should have dimensions (R, p, n),
+where R is the maximum ' number of replicates, p is the dimensionality of the
+data, and n is the number of observations. See the output of
+`generate_data()` for examples}
+
+\item{nclusters}{numeric value, the desired number of clusters.}
+
+\item{iter_max}{numeric maximum number of EM steps to conduct}
+
+\item{tol}{numeric tolerance for difference in likelihood at successive EM
+steps. When two successive steps differ in less than this value the algorithm
+terminates}
+
+\item{init}{string corresponding to the initialization method. Options are
+"kmeans," ' which calls `kmeans()` on the first row of each observation,
+"random," which randomly ' assigns observations to clusters, or "emEM," which
+performs a specified number of short  initial EM runs specified in the
+`emEM_args` parameter, or "given," which uses the inital ' parameters specified
+in `params`.}
+
+\item{params}{list of initial parameter values if `init == "given"`. The list should have values:
+\describe{
+  \item{`mu`}{A matrix with `nclusters` rows and p columns representing the mean vectors for each cluster}
+  \item{`Sigma`}{An array with dimensions (p, p, `nclusters`) corresponding to the covariance matrices for each cluster}
+  \item{`z`}{A matrix with n rows and `nclusters` columns that corresponds to the probabilty of each point belonging in each cluster}
+  \item{`pi`}{An `nclusters` dimensional vector with values corresponding to the mixing proportions of each cluster.}
+  \item{`class`}{An n dimensional vector with the assigned cluster for each observation.}
+}}
+
+\item{emEM_args}{a list of settings for the "emEM" initialization option. The list should have values:
+\describe{
+  \item{`nstarts`}{The number of short EM runs to conduct.}
+  \item{`em_iter`}{The number of EM steps to conduct in each run}
+  \item{`nbest`}{The number of short runs to fully run. The returned solution will be the best of these runs.}
+}}
+}
 \value{
-A list
+A list with the following elements:
+\describe{
+  \item{`z`}{The matrix of class probabilities for each observation}
+  \item{`pi`}{The mixing proportions for each cluster}
+  \item{`mu`}{The mean vectors for each cluster}
+  \item{`Sigma`}{The covariance matrices for each cluster}
+  \item{`class`}{The assigned class for each observation (with the highest value in `z`)}
+  \item{`ll`}{The sequence evaluted log-likelihood values. The length is equal to the number of EM runs that were conducted.}
+  \item{`bic`}{The Bayesian information critereon associated with each of the values in `ll`}
+}
 }
 \description{
-A function to run the EM algorithm on matrix-variate data
+A function to fit a finite mixture model of Gaussian distributions on 
+replicated data. The data are not required to have an equal number of
+replicates for each observation, or each feature within each observation.
+}
+\details{
+A single observation may be of the form:
+\preformatted{
+  x_i11, x_i21, x_i31, x_i41
+  x_i12,   -  , x_i31, x_i41
+  x_i13,   -  , x_i31,   -  
+    -  ,   -  , x_i31,   -  
+}
+
+The finite mixture model assumes that if the the observations were fully
+observed (meaning all features had R available replicates), they follow the distribution
+
+\deqn{
+X_i^* \sim \sum_{k=1}^K \pi_k f(X_i^*;\; \mu_k, \Sigma_k)
+}{X_i^* ~ sum_{k=1}^k pi_k * f(X_i^*; mu_k, Sigma_k)}.
+
+where \eqn{f}{f} is a matrix-variate normal distribution. The mean matrix has
+equal columns equal to \eqn{\mu_k}{mu_k}, column covariance equal to
+\eqn{\Sigma_k}{Sigma_k}, and identity row covariance. 
+
+This inherently assumes that replicates are independent within each subject.
 }
 \examples{
-repclust()
+simulated_data <- generate_data(1000, 4, 10, 0.2)
+res <- repclust(simulated_data$data, 4)
 }

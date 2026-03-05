@@ -14,7 +14,8 @@ generate_data(
   int = c(-5, 5),
   mix_prob = rep(1, K),
   complete = 0.05,
-  rep_prob = rep(1, length(min_reps:max_reps))
+  rep_prob = rep(1, length(min_reps:max_reps)),
+  method = "random"
 )
 }
 \arguments{
@@ -48,6 +49,6 @@ and a vector of class memberships
 Generate matrix-variate data
 }
 \examples{
-data <- generate_data(1000, 4, 10, 0.2)
-res <- run_em(data$data, 4)
+simulated_data <- generate_data(1000, 4, 10, 0.2)
+res <- repclust(simulated_data$data, 4)
 }
