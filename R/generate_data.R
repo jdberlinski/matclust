@@ -21,7 +21,7 @@
 #' data <- generate_data(1000, 4, 10, 0.2)
 #' res <- run_em(data$data, 4)
 generate_data <- function(n, K, p, gom, min_reps = 1, max_reps = 6, int = c(-5, 5), mix_prob = rep(1, K),
-  complete = 0.05, rep_prob = rep(1, length(min_reps:max_reps))) {
+  complete = 0.05, rep_prob = rep(1, length(min_reps:max_reps)), method = "random") {
   mix_prob <- mix_prob / sum(mix_prob)
 
   params <- MixSim::MixGOM(goMega = gom, K = K, p = p, int = int)
@@ -49,11 +49,20 @@ generate_data <- function(n, K, p, gom, min_reps = 1, max_reps = 6, int = c(-5, 
          if (j <= n_complete)
            nij <- rep(max_reps, p)
          # nij <- ifelse(j <= n_complete, rep(max_reps, p), nij)
-         nmax <- max(nij)
-         x <- MASS::mvrnorm(nmax, params$Mu[i, ], params$S[,,i])
-         for (k in 1:p) {
-           if (nij[k] < nmax)
-             x[(nij[k] + 1):nmax, k] <- NA
+         if (method == "random") {
+           nmax <- max(nij)
+           x <- MASS::mvrnorm(nmax, params$Mu[i, ], params$S[,,i])
+           for (k in 1:p) {
+             if (nij[k] < nmax)
+               x[(nij[k] + 1):nmax, k] <- NA
+           }
+         } else if (method == "lowest") {
+           nmax <- max_reps
+           x <- MASS::mvrnorm(nmax, params$Mu[i, ], params$S[,,i])
+           for (k in 1:p) {
+             if (nij[k] < nmax)
+               x[which(order(x[, k]) <= max_reps - nij[k]), k] <- NA
+           }
          }
          data[[length(data) + 1]] <- list(data = x, class = i)
        }

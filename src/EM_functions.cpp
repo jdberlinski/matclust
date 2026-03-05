@@ -16,6 +16,7 @@ List em_step(arma::cube x, arma::mat mu, arma::cube Sigma,  arma::mat z, arma::v
 // distribution given a set of data, using a mixture model
 //
 // double get_ll(arma::cube x, arma::mat mu, arma::cube sig, int R, int p, arma::uvec cl) {
+//' @export
 // [[Rcpp::export]]
 double get_ll(arma::cube x, arma::mat mu, arma::cube sig, int R, int p, arma::mat z) {
 
@@ -23,12 +24,18 @@ double get_ll(arma::cube x, arma::mat mu, arma::cube sig, int R, int p, arma::ma
   arma::uword n = x.n_slices;
   double ll = 0.0;
 
-  // for (arma::uword i = 0; i < n; i++)
-  //   ll += log_f_k(x.slice(i), mu.row(cl(i)), sig.slice(cl(i)), R, p);
-  //
+  // Uncomment this part to use the alternative calculation
+  for (arma::uword i = 0; i < n; i++) {
+    int ind_max = z.row(i).index_max();
+    ll += log_f_k(x.slice(i), mu.row(ind_max), sig.slice(ind_max), R, p);
+  }
+
   // this is a bandaid :)
-  for (arma::uword i = 0; i < n; i++)
-    ll += log(f(x.slice(i), arma::conv_to<arma::colvec>::from(z.row(i)), mu, sig, R, p, sig.n_slices));
+  // for (arma::uword i = 0; i < n; i++)
+  //   ll += log(f(x.slice(i), arma::conv_to<arma::colvec>::from(z.row(i)), mu, sig, R, p, sig.n_slices));
+
+  // // NOTE: see below, dealing with precision
+  // ll += n * log(pow(2.0 * M_PI, -2*R*p));
 
   return ll;
 }
@@ -44,7 +51,10 @@ double f_k(arma::mat xi, arma::rowvec mu, arma::mat sig, int R, int p) {
   arma::mat sig_inv = arma::inv(sig);
   quad_trace = arma::trace((xi - M) * sig_inv * (xi - M).t());
 
-  result = pow(2.0*M_PI, -2*R*p) * pow(exp(arma::log_det_sympd(arma::symmatu(sig))), -0.5*p) * exp(-0.5*quad_trace);
+  // result = pow(2.0*M_PI, -2*R*p) * pow(exp(arma::log_det_sympd(arma::symmatu(sig))), -0.5*p) * exp(-0.5*quad_trace);
+  // NOTE: here the power is being removed to be added later, because of some
+  // computational probelms
+  result = pow(exp(arma::log_det_sympd(arma::symmatu(sig))), -0.5*p) * exp(-0.5*quad_trace);
 
   return result;
 }
@@ -52,8 +62,9 @@ double f_k(arma::mat xi, arma::rowvec mu, arma::mat sig, int R, int p) {
 double f(arma::mat xi, arma::vec pr, arma::mat mu, arma::cube sig, int R, int p, int K) {
   double acc = 0.0;
 
-  for (arma::uword k = 0; k < K; k++)
+  for (arma::uword k = 0; k < K; k++) {
     acc += pr(k) * f_k(xi, mu.row(k), sig.slice(k), R, p);
+  }
 
   return acc;
 }

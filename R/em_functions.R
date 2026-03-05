@@ -1,13 +1,17 @@
-#' run_em
+#' repclust
 #'
-#' A function to run the EM algorithm on matrix-variate data
+#' A function to fit a finite mixture model of Gaussian distributions on
+#' replicated data.
 #'
 #' @return A list
 #' @export
 #'
 #' @examples
-#' run_em()
-run_em <- function(x, nclusters, iter_max = 101, tol = .001, init = "kmeans") {
+#' repclust()
+repclust <- function(x, nclusters, iter_max = 101, tol = .001, init = "kmeans",
+                     params = NULL,
+                     emEM_args = list(nstarts = round(sqrt(nclusters*prod(dim(x)))),
+                                      em_iter = 1, nbest = 10)) {
   R <- dim(x)[1]
   p <- dim(x)[2]
   n <- dim(x)[3]
@@ -35,30 +39,103 @@ run_em <- function(x, nclusters, iter_max = 101, tol = .001, init = "kmeans") {
       mu[k,] <- colMeans(firstx[res$cluster == k,])
     n_k <- table(res$cluster)
     pr <- n_k / sum(n_k)
-  }
+  } else if (init == "emEM") {
+    if (emEM_args$nbest > emEM_args$nstarts) {
+      message("Specified number of starts is less than `nbest`, setting `nstarts` to `nbest`.")
+      emEM_args$nstarts <- emEM_args$nbest
+    }
 
-  z <- matrix(0, nrow = n, ncol = K)
-  # each row contains a cluster mean
-  # mu <- matrix(0, nrow = K, ncol = p)
-  # each slice a pxp covariance matrix
-  Sigma <- array(0, dim = c(p, p, K))
+    message(
+      paste0(
+        "Determining best ", emEM_args$nbest, " values from ",
+        emEM_args$nstarts, " short em runs assuming ", nclusters, " clusters."
+      )
+    )
+    # best_ll <- -Inf
+    best_lls <- rep(-Inf, emEM_args$nbest)
+    # best_res <- NULL
+    best_res <- rep(list(NA), emEM_args$nbest)
+    cutoff <- -Inf
+    for (i in seq_len(emEM_args$nstarts)) {
+      tmp <- repclust(
+        x, nclusters, iter_max = emEM_args$em_iter, tol,
+        init = "kmeans"
+      )
 
-  for (k in 1:K) {
-    for (i in 1:n) {
-      if (res$cluster[i] == k) {
-        Sigma[,,k] <- Sigma[,,k] + t(x[,,i] - rep(1, R) %*% t(mu[k,])) %*% (x[,,i] - rep(1, R) %*% t(mu[k,]))
+      if (i <= emEM_args$nbest) {
+        best_res[[i]] <- tmp
+        best_lls[i] <- tmp$ll[length(tmp$ll)]
+      } else if (tmp$ll[length(tmp$ll)] > cutoff) {
+        best_res[[emEM_args$nbest]] <- tmp
+        best_lls[emEM_args$nbest] <- tmp$ll[length(tmp$ll)]
+        ll_order <- order(best_lls)
+        best_lls <- best_lls[ll_order]
+        best_res <- best_res[ll_order]
+      }
+
+      cutoff <- min(best_lls, na.rm = TRUE)
+      # NOTE: possibly change this to have best_lls and best_res store all of
+      # the `nstarts` results, and only select the `nbest` ones after
+    }
+
+    best_long_ll <- -Inf
+    best_long_res <- NULL
+
+    for (i in seq_len(emEM_args$nbest)) {
+      message(
+        paste0(
+          "Running long EM from best em runs: ", i, " of ",
+          emEM_args$nbest, " total assuming ", nclusters,
+          " clusters..."
+        )
+      )
+      tmp <- repclust(
+        x, nclusters, iter_max = iter_max, tol = tol,
+        init = "given", params = best_res[[i]]
+      )
+
+      if (tmp$ll[length(tmp$ll)] > best_long_ll) {
+        best_long_ll <- tmp$ll[length(tmp$ll)]
+        best_long_res <- tmp
       }
     }
-    Sigma[,,k] <- Sigma[,,k] / (n_k[k] * R)
+
+    return(best_long_res)
   }
 
   ll <- numeric(iter_max + 1)
   bic <- numeric(iter_max + 1)
-  cl <- apply(z, 1, which.max) - 1
-  # ll[1] <- get_ll(x, mu, Sigma, R, p, res$cluster - 1)
-  # TODO: bandaid
-  z <- model.matrix(~ 0 + x, data.frame(x = factor(res$cluster))) |> as.data.frame() |> as.matrix()
-  ll[1] <- get_ll(x, mu, Sigma, R, p, z)
+  if (init != "given") {
+    z <- matrix(0, nrow = n, ncol = K)
+    # each row contains a cluster mean
+    # mu <- matrix(0, nrow = K, ncol = p)
+    # each slice a pxp covariance matrix
+    Sigma <- array(0, dim = c(p, p, K))
+
+    for (k in 1:K) {
+      for (i in 1:n) {
+        if (res$cluster[i] == k) {
+          Sigma[,,k] <- Sigma[,,k] + t(x[,,i] - rep(1, R) %*% t(mu[k,])) %*% (x[,,i] - rep(1, R) %*% t(mu[k,]))
+        }
+      }
+      Sigma[,,k] <- Sigma[,,k] / (n_k[k] * R)
+    }
+
+    cl <- apply(z, 1, which.max) - 1
+    # ll[1] <- get_ll(x, mu, Sigma, R, p, res$cluster - 1)
+    # TODO: bandaid
+    z <- model.matrix(~ 0 + x, data.frame(x = factor(res$cluster))) |> as.data.frame() |> as.matrix()
+    ll[1] <- get_ll(x, mu, Sigma, R, p, z)
+  } else {
+    mu <- params$mu
+    Sigma <- params$Sigma
+    z <- params$z
+    pr <- params$pi
+    cl <- params$class - 1
+
+    ll[1] <- params$ll[length(params$ll)]
+    bic[1] <- params$bic[length(params$bic)]
+  }
 
   # for testing initialization
   if (iter_max == 0) {
