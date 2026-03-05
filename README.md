@@ -4,7 +4,7 @@ The function `repclust()` is used to cluster observations via a finite mixture o
 
 Observations are allowed to have an unequal number of observations, both between observations and between features of hte same observation.
 
-See `?repclust` for more information on the model, and `?generate_data` to see the expect format for data.funciton.
+See `?repclust` for more information on the model, and `?generate_data` to see the expected format for data.
 
 ## Installation
 With `devtools` (or `remotes`):
