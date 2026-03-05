@@ -35,7 +35,7 @@ generate_data(
 
 \item{mix_prob}{Vector of mixing proportions for each cluster}
 
-\item{complete}{Proportion of fully observed cases (with `max_reps` rows of
+\item{complete}{Proportion of fully observed cases (with \code{max_reps} rows of
 fully observed data) to be present for each cluster}
 
 \item{rep_prob}{Vector of probabilities for each value of min_reps:max_reps
