@@ -2,7 +2,7 @@
 
 The function `repclust()` is used to cluster observations via a finite mixture of matrix-variate normal distributions.
 
-Observations are allowed to have an unequal number of observations, both between observations and between features of hte same observation.
+Observations are allowed to have an unequal number of observations, both between observations and between features of the same observation.
 
 See `?repclust` for more information on the model, and `?generate_data` to see the expected format for data.
 
