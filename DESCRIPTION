@@ -3,10 +3,15 @@ Type: Package
 Title: Clustering for matrix-variate normal data with uneven replecations
 Version: 0.1.0
 Date: 2023-04-20
-Author: Who wrote it
-Maintainer: Who to complain to <yourfault@somewhere.net>
-Description: More about what it does (maybe more than one line)
-License: What license is it under?
-Imports: Rcpp (>= 1.0.8.3)
-LinkingTo: Rcpp, RcppArmadillo
+Description: Finite mixture model for replicated data without discarding
+    replicate information. There may be an unequal number of replicates between
+    features of each observation, allowing for "jagged" observations.
+License: GPL (>= 3)
+Imports: 
+    Rcpp (>= 1.1.1)
+LinkingTo: 
+    Rcpp (>= 1.1.1),
+    RcppArmadillo (>= 15.2.3-1)
 RoxygenNote: 7.3.2
+Authors@R: 
+    person("Josh", "Berlinski", , "jdberlinski@gmail.com", role = c("aut", "cre"))

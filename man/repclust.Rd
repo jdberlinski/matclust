@@ -82,8 +82,8 @@ The finite mixture model assumes that if the the observations were fully
 observed (meaning all features had R available replicates), they follow the distribution
 
 \deqn{
-X_i^* \sim \sum_{k=1}^K \pi_k f(X_i^*;\; \mu_k, \Sigma_k)
-}{X_i^* ~ sum_{k=1}^k pi_k * f(X_i^*; mu_k, Sigma_k)}.
+X_i^* \sim \sum_{k=1}^K \pi_k f(X_i^*;\; \mu_k, \Sigma_k).
+}{X_i^* ~ sum_{k=1}^k pi_k * f(X_i^*; mu_k, Sigma_k).}
 
 where \eqn{f}{f} is a matrix-variate normal distribution. The mean matrix has
 equal columns equal to \eqn{\mu_k}{mu_k}, column covariance equal to
