@@ -1,30 +1,30 @@
 #' Gaussian mixture models for replicated data
 #'
-#' A function to fit a finite mixture model of Gaussian distributions on 
+#' A function to fit a finite mixture model of Gaussian distributions on
 #' replicated data. The data are not required to have an equal number of
 #' replicates for each observation, or each feature within each observation.
-#' 
+#'
 #' A single observation may be of the form:
 #' \preformatted{
 #'   x_i11, x_i21, x_i31, x_i41
 #'   x_i12,   -  , x_i31, x_i41
-#'   x_i13,   -  , x_i31,   -  
-#'     -  ,   -  , x_i31,   -  
+#'   x_i13,   -  , x_i31,   -
+#'     -  ,   -  , x_i31,   -
 #' }
 #'
 #' The finite mixture model assumes that if the the observations were fully
 #' observed (meaning all features had R available replicates), they follow the distribution
-#' 
+#'
 #' \deqn{
 #' X_i^* \sim \sum_{k=1}^K \pi_k f(X_i^*;\; \mu_k, \Sigma_k).
 #' }{X_i^* ~ sum_{k=1}^k pi_k * f(X_i^*; mu_k, Sigma_k).}
-#' 
+#'
 #' where \eqn{f}{f} is a matrix-variate normal distribution. The mean matrix has
 #' equal columns equal to \eqn{\mu_k}{mu_k}, column covariance equal to
-#' \eqn{\Sigma_k}{Sigma_k}, and identity row covariance. 
-#' 
+#' \eqn{\Sigma_k}{Sigma_k}, and identity row covariance.
+#'
 #' This inherently assumes that replicates are independent within each subject.
-#' 
+#'
 #' @param x The array of data to be clustered. Should have dimensions (R, p, n),
 #' where R is the maximum ' number of replicates, p is the dimensionality of the
 #' data, and n is the number of observations. See the output of
@@ -54,7 +54,7 @@
 #'   \item{`em_iter`}{The number of EM steps to conduct in each run}
 #'   \item{`nbest`}{The number of short runs to fully run. The returned solution will be the best of these runs.}
 #' }
-#' 
+#'
 #' @return A list with the following elements:
 #' \describe{
 #'   \item{`z`}{The matrix of class probabilities for each observation}
@@ -65,7 +65,7 @@
 #'   \item{`ll`}{The sequence evaluted log-likelihood values. The length is equal to the number of EM runs that were conducted.}
 #'   \item{`bic`}{The Bayesian information critereon associated with each of the values in `ll`}
 #' }
-#' 
+#'
 #' @export
 #'
 #' @examples
@@ -139,13 +139,27 @@ repclust <- function(
     best_res <- rep(list(NA), emEM_args$nbest)
     cutoff <- -Inf
     for (i in seq_len(emEM_args$nstarts)) {
-      tmp <- repclust(
-        x,
-        nclusters,
-        iter_max = emEM_args$em_iter,
-        tol,
-        init = "kmeans"
-      )
+      # tmp <- repclust(
+      #   x,
+      #   nclusters,
+      #   iter_max = emEM_args$em_iter,
+      #   tol,
+      #   init = "kmeans"
+      # )
+
+      tmp <-
+        tryCatch({
+          repclust(
+            x,
+            nclusters,
+            iter_max = emEM_args$em_iter,
+            tol = tol,
+            init = "kmeans"
+          )},
+          error = function(e) return(NA)
+        )
+
+      if (!is.list(tmp)) next
 
       if (i <= emEM_args$nbest) {
         best_res[[i]] <- tmp
@@ -178,14 +192,23 @@ repclust <- function(
           " clusters..."
         )
       )
-      tmp <- repclust(
-        x,
-        nclusters,
-        iter_max = iter_max,
-        tol = tol,
-        init = "given",
-        params = best_res[[i]]
-      )
+      tmp <-
+        tryCatch({
+          repclust(
+            x,
+            nclusters,
+            iter_max = iter_max,
+            tol = tol,
+            init = "given",
+            params = best_res[[i]]
+          )},
+          error = function(e) return(NA)
+        )
+
+      if (!is.list(tmp)) {
+        message("\tEncountered error, skipping run.")
+        next
+      }
 
       if (tmp$ll[length(tmp$ll)] > best_long_ll) {
         best_long_ll <- tmp$ll[length(tmp$ll)]
@@ -254,6 +277,9 @@ repclust <- function(
 
     ll[iter + 1] <- params$ll
     bic[iter + 1] <- params$bic
+
+    if (is.na(abs((ll[iter + 1] - ll[iter]) / ll[iter])))
+      print(ll)
 
     if (abs((ll[iter + 1] - ll[iter]) / ll[iter]) < tol) {
       break

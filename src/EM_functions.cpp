@@ -21,17 +21,18 @@ List em_step(arma::cube x, arma::mat mu, arma::cube Sigma,  arma::mat z, arma::v
 double get_ll(arma::cube x, arma::mat mu, arma::cube sig, int R, int p, arma::mat z) {
   arma::uword n = x.n_slices;
   double ll = 0.0;
- 
+
   // Uncomment the next 4 lines for the alternative calculation. Necessary on occasion for precesion when calculating LL or BIC
-  // for (arma::uword i = 0; i < n; i++) {
-  //   int ind_max = z.row(i).index_max();
-  //   ll += log_f_k(x.slice(i), mu.row(ind_max), sig.slice(ind_max), R, p);
-  // }
+  for (arma::uword i = 0; i < n; i++) {
+    int ind_max = z.row(i).index_max();
+    ll += log_f_k(x.slice(i), mu.row(ind_max), sig.slice(ind_max), R, p);
+  }
+
 
   // Comment the next 3 lines for alternative calculation
-  for (arma::uword i = 0; i < n; i++)
-    ll += log(f(x.slice(i), arma::conv_to<arma::colvec>::from(z.row(i)), mu, sig, R, p, sig.n_slices));
-  ll += n * log(pow(2.0 * M_PI, -2*R*p)); // for precision. 
+  // for (arma::uword i = 0; i < n; i++)
+  //   ll += log(f(x.slice(i), arma::conv_to<arma::colvec>::from(z.row(i)), mu, sig, R, p, sig.n_slices));
+  // ll += n * log(pow(2.0 * M_PI, -2*R*p)); // for precision.
 
   return ll;
 }
@@ -43,13 +44,13 @@ double f_k(arma::mat xi, arma::rowvec mu, arma::mat sig, int R, int p) {
   arma::mat M(R, p, arma::fill::zeros);
   M.each_row() += mu;
 
-  // arma::mat sig_inv = arma::inv_sympd(arma::symmatu(sig));
+  // see reasoning for re-inserting this below
+  if (!sig.is_sympd())
+    sig.diag() += 1e-4;
+
   arma::mat sig_inv = arma::inv(sig);
   quad_trace = arma::trace((xi - M) * sig_inv * (xi - M).t());
 
-  // result = pow(2.0*M_PI, -2*R*p) * pow(exp(arma::log_det_sympd(arma::symmatu(sig))), -0.5*p) * exp(-0.5*quad_trace);
-  // NOTE: here the power is being removed to be added later, because of some
-  // computational probelms
   result = pow(exp(arma::log_det_sympd(arma::symmatu(sig))), -0.5*p) * exp(-0.5*quad_trace);
 
   return result;
@@ -68,19 +69,19 @@ double f(arma::mat xi, arma::vec pr, arma::mat mu, arma::cube sig, int R, int p,
 // [[Rcpp::export]]
 double log_f_k(arma::mat xi, arma::rowvec mu, arma::mat sig, int R, int p) {
   // mean matrix
-  // TODO: is there a better way to create a matrix that has identical rows?
-  //       perhaps one way is to create wiht identical columns and transpose it.
-  /* arma::mat M = arma::vec(R, arma::fill::ones) * mu.t(); */
   arma::mat M(R, p, arma::fill::zeros);
   M.each_row() += mu;
 
-  arma::mat sig_inv = arma::inv_sympd(arma::symmatu(sig));
+  // it is quite important here that this condition is met, as assigning result
+  // to a double requires the use of log_det_sympd()
+  if (!sig.is_sympd())
+    sig.diag() += 1e-4;
+
+  arma::mat sig_inv = arma::inv(sig);
 
   double quad_trace = arma::trace((xi - M) * sig_inv * (xi - M).t());
 
-  double result = (-R * p * 0.5) * std::log(2.0 * M_PI) +
-    (-p * 0.5) * arma::log_det_sympd(arma::symmatu(sig)) +
-    (-0.5 * quad_trace);
+  double result = (-R * p * 0.5) * std::log(2.0 * M_PI) + (-p * 0.5) * arma::log_det_sympd(arma::symmatu(sig)) + (-0.5 * quad_trace);
 
   return result;
 }
@@ -172,12 +173,12 @@ List em_step(
       for (j = 0; j < K; j++) {
         m_k.zeros();
         m_k.each_row() += mu.row(j);
-        x.slice(i).elem(miss) += z(i, j) * (m_k.elem(miss) + S.slice(j).submat(miss, nmiss) * arma::inv_sympd(arma::symmatu(S.slice(j).submat(nmiss, nmiss))) * (x.slice(i).elem(nmiss) - m_k.elem(nmiss)));
+        x.slice(i).elem(miss) += z(i, j) * (m_k.elem(miss) + S.slice(j).submat(miss, nmiss) * arma::inv(S.slice(j).submat(nmiss, nmiss)) * (x.slice(i).elem(nmiss) - m_k.elem(nmiss)));
       }
 
       // conditional variance of the missing portion of x_i given the observed
       // portion. used to calculate E(X'X) in covariance estimation
-      Phi = S.slice(k).submat(miss, miss) - S.slice(k).submat(miss, nmiss) * arma::inv_sympd(arma::symmatu(S.slice(k).submat(nmiss, nmiss))) * S.slice(k).submat(nmiss, miss);
+      Phi = S.slice(k).submat(miss, miss) - S.slice(k).submat(miss, nmiss) * arma::inv(S.slice(k).submat(nmiss, nmiss)) * S.slice(k).submat(nmiss, miss);
 
       acc += z(i, k) * arma::mean(x.slice(i), 0);
       diff = x.slice(i) - M;
@@ -196,6 +197,10 @@ List em_step(
     mu.row(k) = acc / den;
     Sigma.slice(k) = sacc / (R * den);
     pr(k) = den / n;
+
+    // relax some conditions
+    if (!Sigma.slice(k).is_sympd())
+      Sigma.slice(k).diag() += 1e-6;
   }
 
   // assign "hard" clusters
