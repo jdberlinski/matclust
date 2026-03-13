@@ -10,7 +10,7 @@ log_f_k <- function(xi, mu, sig, R, p) {
     .Call(`_matclust_log_f_k`, xi, mu, sig, R, p)
 }
 
-em_step <- function(x, mu, Sigma, z, pr, cl, A, n, K, R, p, iter) {
-    .Call(`_matclust_em_step`, x, mu, Sigma, z, pr, cl, A, n, K, R, p, iter)
+em_step <- function(x, mu, Sigma, z, pr, cl, A, n, K, R, p, iter, constr) {
+    .Call(`_matclust_em_step`, x, mu, Sigma, z, pr, cl, A, n, K, R, p, iter, constr)
 }
 

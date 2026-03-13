@@ -78,6 +78,7 @@ repclust <- function(
   tol = .001,
   init = "kmeans",
   params = NULL,
+  sigma_constr = "VVV",
   emEM_args = list(
     nstarts = round(sqrt(nclusters * prod(dim(x)))),
     em_iter = 1,
@@ -213,6 +214,8 @@ repclust <- function(
       if (tmp$ll[length(tmp$ll)] > best_long_ll) {
         best_long_ll <- tmp$ll[length(tmp$ll)]
         best_long_res <- tmp
+        best_long_res$ll <- c(best_res[[i]]$ll, tmp$ll)
+        best_long_res$bic <- c(best_res[[i]]$bic, tmp$bic)
       }
     }
 
@@ -266,7 +269,7 @@ repclust <- function(
 
   # EM loop
   for (iter in 1:iter_max) {
-    params <- em_step(x, mu, Sigma, z, pr, cl, A, n, K, R, p, iter)
+    params <- em_step(x, mu, Sigma, z, pr, cl, A, n, K, R, p, iter, sigma_constr)
 
     mu <- params$mu
     Sigma <- params$Sigma

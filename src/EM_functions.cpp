@@ -1,4 +1,5 @@
 #include <RcppArmadillo.h>
+#include <string>
 using namespace Rcpp;
 
 // [[Rcpp::depends(RcppArmadillo)]]
@@ -10,7 +11,7 @@ double f_k(arma::mat xi, arma::rowvec mu, arma::mat sig, int R, int p);
 double f(arma::mat xi, arma::vec pr, arma::mat mu, arma::cube sig, int R, int p, int K);
 arma::mat make_mask(arma::urowvec inds, int ncols);
 List em_step(arma::cube x, arma::mat mu, arma::cube Sigma,  arma::mat z, arma::vec pr, arma::vec cl,
-    arma::cube A, int n, int K, int R, int p, int iter);
+    arma::cube A, int n, int K, int R, int p, int iter, std::string constr);
 
 // function for obtaining the log-liklihood for the matrix-variate normal
 // distribution given a set of data, using a mixture model
@@ -109,7 +110,8 @@ List em_step(
   int K,             // number of clusters
   int R,             // number of rows in data
   int p,             // number of columns in data
-  int iter           // iteration number
+  int iter,          // iteration number
+  std::string constr // constrain on covariances
 ) {
 
   // loop variables
@@ -155,9 +157,11 @@ List em_step(
   // M step
   for (k = 0; k < K; k++) {
     acc.zeros();
-    sacc.zeros();
     M.zeros();
     M.each_row() += mu.row(k);
+
+    if (constr == "VVV" || k == 0)
+      sacc.zeros();
 
     den = arma::sum(z.col(k));
 
@@ -195,19 +199,34 @@ List em_step(
     }
 
     mu.row(k) = acc / den;
-    Sigma.slice(k) = sacc / (R * den);
     pr(k) = den / n;
 
-    // relax some conditions
-    if (!Sigma.slice(k).is_sympd())
-      Sigma.slice(k).diag() += 1e-6;
+    if (constr == "VVV") {
+      Sigma.slice(k) = sacc / (R * den);
+      // relax some conditions
+      if (!Sigma.slice(k).is_sympd())
+        Sigma.slice(k).diag() += 1e-6;
+    }
+  }
+
+  if (constr == "EEE") {
+    for (k = 0; k < K; k++) {
+      Sigma.slice(k) = sacc / (R * n);
+      // relax some conditions
+      if (!Sigma.slice(k).is_sympd())
+        Sigma.slice(k).diag() += 1e-6;
+    }
   }
 
   // assign "hard" clusters
   cl = arma::index_max(z, 1);
 
   ll = get_ll(x, mu, Sigma, R, p, z);
-  bic = -2 * ll + log(n) * (K + K*p + K*p*(p + 1)/2);
+
+  if (constr == "VVV")
+    bic = -2 * ll + log(n) * (K + K*p + K*p*(p + 1)/2);
+  if (constr == "EEE")
+    bic = -2 * ll + log(n) * (K + K*p + p*(p + 1)/2);
 
   return List::create(
       Named("x") = x,
