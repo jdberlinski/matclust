@@ -270,7 +270,7 @@ repclust <- function(
       as.data.frame() |>
       as.matrix()
 
-    ll[1] <- get_ll(x, mu, Sigma, R, p, z)
+    ll[1] <- get_ll(x, mu, Sigma, A, R, p, z)
   } else {
     mu <- params$mu
     Sigma <- params$Sigma

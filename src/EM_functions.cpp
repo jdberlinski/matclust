@@ -5,7 +5,8 @@ using namespace Rcpp;
 // [[Rcpp::depends(RcppArmadillo)]]
 
 // double get_ll(arma::cube x, arma::mat mu, arma::cube sig, int R, int p, arma::uvec cl);
-double get_ll(arma::cube x, arma::mat mu, arma::cube sig, int R, int p, arma::mat z);
+double get_ll(arma::cube x, arma::mat mu, arma::cube sig, arma::cube A, int R, int p, arma::mat z);
+double log_f_k_observed(arma::mat xi, arma::rowvec mu, arma::mat Sigma, arma::mat A_i);
 double log_f_k(arma::mat xi, arma::rowvec mu, arma::mat sig, int R, int p);
 double f_k(arma::mat xi, arma::rowvec mu, arma::mat sig, int R, int p);
 double f(arma::mat xi, arma::vec pr, arma::mat mu, arma::cube sig, int R, int p, int K);
@@ -19,21 +20,14 @@ List em_step(arma::cube x, arma::mat mu, arma::cube Sigma,  arma::mat z, arma::v
 // double get_ll(arma::cube x, arma::mat mu, arma::cube sig, int R, int p, arma::uvec cl) {
 //' @export
 // [[Rcpp::export]]
-double get_ll(arma::cube x, arma::mat mu, arma::cube sig, int R, int p, arma::mat z) {
+double get_ll(arma::cube x, arma::mat mu, arma::cube sig, arma::cube A, int R, int p, arma::mat z) {
   arma::uword n = x.n_slices;
   double ll = 0.0;
 
-  // Uncomment the next 4 lines for the alternative calculation. Necessary on occasion for precesion when calculating LL or BIC
   for (arma::uword i = 0; i < n; i++) {
     int ind_max = z.row(i).index_max();
-    ll += log_f_k(x.slice(i), mu.row(ind_max), sig.slice(ind_max), R, p);
+    ll += log_f_k_observed(x.slice(i), mu.row(ind_max), sig.slice(ind_max), A.slice(i));
   }
-
-
-  // Comment the next 3 lines for alternative calculation
-  // for (arma::uword i = 0; i < n; i++)
-  //   ll += log(f(x.slice(i), arma::conv_to<arma::colvec>::from(z.row(i)), mu, sig, R, p, sig.n_slices));
-  // ll += n * log(pow(2.0 * M_PI, -2*R*p)); // for precision.
 
   return ll;
 }
@@ -85,6 +79,31 @@ double log_f_k(arma::mat xi, arma::rowvec mu, arma::mat sig, int R, int p) {
   double result = (-R * p * 0.5) * std::log(2.0 * M_PI) + (-p * 0.5) * arma::log_det_sympd(arma::symmatu(sig)) + (-0.5 * quad_trace);
 
   return result;
+}
+
+double log_f_k_observed(arma::mat xi, arma::rowvec mu, arma::mat Sigma, arma::mat A_i) {
+  int R = xi.n_rows;
+  double ll = 0.0;
+
+  for (int r = 0; r < R; r++) {
+    arma::uvec obs_r = arma::find(A_i.row(r) < 0.5);
+    if (obs_r.is_empty()) continue;
+
+    int d = obs_r.n_elem;
+    arma::rowvec xi_r = xi.row(r);
+    arma::vec x_sub  = xi_r.elem(obs_r);
+    arma::vec mu_sub = mu.elem(obs_r);
+    arma::mat S_sub  = Sigma.submat(obs_r, obs_r);
+
+    if (!S_sub.is_sympd())
+      S_sub.diag() += 1e-4;
+
+    arma::vec diff = x_sub - mu_sub;
+    ll += -0.5 * d * std::log(2.0 * M_PI)
+        - 0.5 * arma::log_det_sympd(S_sub)
+        - 0.5 * arma::dot(diff, arma::solve(S_sub, diff));
+  }
+  return ll;
 }
 
 arma::mat make_mask(arma::urowvec inds, int ncols) {
@@ -141,25 +160,19 @@ List em_step(
 
   double ll, bic;
 
-  // (E step)
-  //   update class memebership probabilities,
-  //   to be used for caculating conditional expectations
+  // precompute Kronecker products needed for M-step imputation
+  for (k = 0; k < K; k++)
+    S.slice(k) = arma::kron(Sigma.slice(k), I);
+
+  // E step: compute log responsibilities using observed-data likelihood,
+  // then normalize row-wise via log-sum-exp for numerical stability
+  arma::mat log_z(n, K);
   for (i = 0; i < n; i++) {
-    for (k = 0; k < K; k++) {
-      z(i, k) = pr(k) * f_k(x.slice(i), mu.row(k), Sigma.slice(k), R, p);
-
-      // adjust some numerical issues. these two switches are generally fine
-      if (std::isinf(z(i, k)))
-        z(i, k) = 1;
-      else if (std::isnan(z(i, k)))
-        z(i, k) = 0;
-
-      S.slice(k) = arma::kron(Sigma.slice(k), I);
-    }
+    for (k = 0; k < K; k++)
+      log_z(i, k) = std::log(pr(k)) + log_f_k_observed(x.slice(i), mu.row(k), Sigma.slice(k), A.slice(i));
+    double lse = log_z.row(i).max() + std::log(arma::sum(arma::exp(log_z.row(i) - log_z.row(i).max())));
+    z.row(i) = arma::exp(log_z.row(i) - lse);
   }
-  // NOTE: is there a precision problem here?
-
-  z = arma::normalise(z, 1, 1);
 
   // M step
   for (k = 0; k < K; k++) {
@@ -237,7 +250,7 @@ List em_step(
   // assign "hard" clusters
   cl = arma::index_max(z, 1);
 
-  ll = get_ll(x, mu, Sigma, R, p, z);
+  ll = get_ll(x, mu, Sigma, A, R, p, z);
 
   if (constr == "VVV")
     bic = -2 * ll + log(n) * (K + K*p + K*p*(p + 1)/2);

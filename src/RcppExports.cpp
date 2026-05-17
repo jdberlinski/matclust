@@ -12,18 +12,19 @@ Rcpp::Rostream<false>& Rcpp::Rcerr = Rcpp::Rcpp_cerr_get();
 #endif
 
 // get_ll
-double get_ll(arma::cube x, arma::mat mu, arma::cube sig, int R, int p, arma::mat z);
-RcppExport SEXP _matclust_get_ll(SEXP xSEXP, SEXP muSEXP, SEXP sigSEXP, SEXP RSEXP, SEXP pSEXP, SEXP zSEXP) {
+double get_ll(arma::cube x, arma::mat mu, arma::cube sig, arma::cube A, int R, int p, arma::mat z);
+RcppExport SEXP _matclust_get_ll(SEXP xSEXP, SEXP muSEXP, SEXP sigSEXP, SEXP ASEXP, SEXP RSEXP, SEXP pSEXP, SEXP zSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
     Rcpp::traits::input_parameter< arma::cube >::type x(xSEXP);
     Rcpp::traits::input_parameter< arma::mat >::type mu(muSEXP);
     Rcpp::traits::input_parameter< arma::cube >::type sig(sigSEXP);
+    Rcpp::traits::input_parameter< arma::cube >::type A(ASEXP);
     Rcpp::traits::input_parameter< int >::type R(RSEXP);
     Rcpp::traits::input_parameter< int >::type p(pSEXP);
     Rcpp::traits::input_parameter< arma::mat >::type z(zSEXP);
-    rcpp_result_gen = Rcpp::wrap(get_ll(x, mu, sig, R, p, z));
+    rcpp_result_gen = Rcpp::wrap(get_ll(x, mu, sig, A, R, p, z));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -67,7 +68,7 @@ END_RCPP
 }
 
 static const R_CallMethodDef CallEntries[] = {
-    {"_matclust_get_ll", (DL_FUNC) &_matclust_get_ll, 6},
+    {"_matclust_get_ll", (DL_FUNC) &_matclust_get_ll, 7},
     {"_matclust_log_f_k", (DL_FUNC) &_matclust_log_f_k, 5},
     {"_matclust_em_step", (DL_FUNC) &_matclust_em_step, 13},
     {NULL, NULL, 0}
