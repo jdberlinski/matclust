@@ -38,6 +38,10 @@
 #' "kmeans," ' which calls `kmeans()` on the first row of each observation,
 #' "random," which randomly ' assigns observations to clusters, or "emEM," which
 #' performs a specified number of short  initial EM runs specified in the
+#' @param sph logical indicating if the resulting covariance matrices should be
+#' spherical
+#' @param hom logical indicating if the resulting covariance matrices should
+#' homogeneous across clusters
 #' `emEM_args` parameter, or "given," which uses the inital ' parameters specified
 #' in `params`.
 #' @param params list of initial parameter values if `init == "given"`. The list should have values:
@@ -77,8 +81,9 @@ repclust <- function(
   iter_max = 101,
   tol = .001,
   init = "kmeans",
+  sph = FALSE,
+  hom = FALSE,
   params = NULL,
-  sigma_constr = "VVV",
   emEM_args = list(
     nstarts = round(sqrt(nclusters * prod(dim(x)))),
     em_iter = 1,
@@ -97,6 +102,18 @@ repclust <- function(
     for (j in 1:p) {
       x[which(is.na(x[, j, i])), j, i] <- 0
     }
+  }
+
+  if (sph) {
+    if (hom)
+      sigma_constr <- "EII"
+    else
+      sigma_constr <- "VII"
+  } else {
+    if (hom)
+      sigma_constr <- "EEE"
+    else
+      sigma_constr <- "VVV"
   }
 
   # obtain initial solution using K-means on first replicate for each data point
@@ -155,7 +172,9 @@ repclust <- function(
             nclusters,
             iter_max = emEM_args$em_iter,
             tol = tol,
-            init = "kmeans"
+            init = "kmeans",
+            hom = hom,
+            sph = sph
           )},
           error = function(e) return(NA)
         )
@@ -193,6 +212,7 @@ repclust <- function(
           " clusters..."
         )
       )
+
       tmp <-
         tryCatch({
           repclust(
@@ -201,7 +221,9 @@ repclust <- function(
             iter_max = iter_max,
             tol = tol,
             init = "given",
-            params = best_res[[i]]
+            params = best_res[[i]],
+            hom = hom,
+            sph = sph
           )},
           error = function(e) return(NA)
         )
@@ -243,11 +265,11 @@ repclust <- function(
     }
 
     cl <- apply(z, 1, which.max) - 1
-    # ll[1] <- get_ll(x, mu, Sigma, R, p, res$cluster - 1)
-    # TODO: bandaid
+
     z <- model.matrix(~ 0 + x, data.frame(x = factor(res$cluster))) |>
       as.data.frame() |>
       as.matrix()
+
     ll[1] <- get_ll(x, mu, Sigma, R, p, z)
   } else {
     mu <- params$mu
@@ -256,6 +278,7 @@ repclust <- function(
     pr <- params$pi
     cl <- params$class - 1
 
+    # ll[1] <- get_ll(x, mu, Sigma, R, p, z)
     ll[1] <- params$ll[length(params$ll)]
     bic[1] <- params$bic[length(params$bic)]
   }
@@ -269,17 +292,21 @@ repclust <- function(
 
   # EM loop
   for (iter in 1:iter_max) {
-    params <- em_step(x, mu, Sigma, z, pr, cl, A, n, K, R, p, iter, sigma_constr)
+    new_params <- em_step(x, mu, Sigma, z, pr, cl, A, n, K, R, p, iter, sigma_constr)
 
-    mu <- params$mu
-    Sigma <- params$Sigma
-    z <- params$z
-    pr <- params$pr
-    cl <- params$cl
-    x <- params$x
+    # prevent oscillating likelihood when there are numerical issues
+    # if (ll[iter] > new_params$ll)
+    #   break
 
-    ll[iter + 1] <- params$ll
-    bic[iter + 1] <- params$bic
+    mu <- new_params$mu
+    Sigma <- new_params$Sigma
+    z <- new_params$z
+    pr <- new_params$pr
+    cl <- new_params$cl
+    x <- new_params$x
+
+    ll[iter + 1] <- new_params$ll
+    bic[iter + 1] <- new_params$bic
 
     if (is.na(abs((ll[iter + 1] - ll[iter]) / ll[iter])))
       print(ll)

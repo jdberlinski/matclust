@@ -147,6 +147,13 @@ List em_step(
   for (i = 0; i < n; i++) {
     for (k = 0; k < K; k++) {
       z(i, k) = pr(k) * f_k(x.slice(i), mu.row(k), Sigma.slice(k), R, p);
+
+      // adjust some numerical issues. these two switches are generally fine
+      if (std::isinf(z(i, k)))
+        z(i, k) = 1;
+      else if (std::isnan(z(i, k)))
+        z(i, k) = 0;
+
       S.slice(k) = arma::kron(Sigma.slice(k), I);
     }
   }
@@ -160,7 +167,7 @@ List em_step(
     M.zeros();
     M.each_row() += mu.row(k);
 
-    if (constr == "VVV" || k == 0)
+    if (constr == "VVV" || constr == "VII" || k == 0)
       sacc.zeros();
 
     den = arma::sum(z.col(k));
@@ -206,12 +213,21 @@ List em_step(
       // relax some conditions
       if (!Sigma.slice(k).is_sympd())
         Sigma.slice(k).diag() += 1e-6;
+    } else if ( constr == "VII" ) {
+      Sigma.slice(k) = arma::diagmat(sacc / (R * den));
     }
   }
 
   if (constr == "EEE") {
     for (k = 0; k < K; k++) {
       Sigma.slice(k) = sacc / (R * n);
+      // relax some conditions
+      if (!Sigma.slice(k).is_sympd())
+        Sigma.slice(k).diag() += 1e-6;
+    }
+  } else if (constr == "EII") {
+    for (k = 0; k < K; k++) {
+      Sigma.slice(k) = arma::diagmat(sacc / (R * n));
       // relax some conditions
       if (!Sigma.slice(k).is_sympd())
         Sigma.slice(k).diag() += 1e-6;
@@ -225,8 +241,12 @@ List em_step(
 
   if (constr == "VVV")
     bic = -2 * ll + log(n) * (K + K*p + K*p*(p + 1)/2);
-  if (constr == "EEE")
+  else if (constr == "VII")
+    bic = -2 * ll + log(n) * (K + K*p + K*p);
+  else if (constr == "EEE")
     bic = -2 * ll + log(n) * (K + K*p + p*(p + 1)/2);
+  else if (constr == "EII")
+    bic = -2 * ll + log(n) * (K + K*p + p);
 
   return List::create(
       Named("x") = x,
