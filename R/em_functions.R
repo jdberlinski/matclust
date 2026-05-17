@@ -157,14 +157,6 @@ repclust <- function(
     best_res <- rep(list(NA), emEM_args$nbest)
     cutoff <- -Inf
     for (i in seq_len(emEM_args$nstarts)) {
-      # tmp <- repclust(
-      #   x,
-      #   nclusters,
-      #   iter_max = emEM_args$em_iter,
-      #   tol,
-      #   init = "kmeans"
-      # )
-
       tmp <-
         tryCatch({
           repclust(
@@ -172,7 +164,7 @@ repclust <- function(
             nclusters,
             iter_max = emEM_args$em_iter,
             tol = tol,
-            init = "kmeans",
+            init = "random",
             hom = hom,
             sph = sph
           )},
