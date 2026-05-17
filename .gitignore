@@ -1,0 +1,29 @@
+# R package build artifacts
+*.tar.gz
+*.zip
+
+# Compiled source files
+*.o
+*.so
+*.dll
+
+# R session and history
+.Rhistory
+.RData
+.Rproj.user/
+.Rproj
+
+# Package documentation
+/docs/
+
+# devtools / usethis state
+/.Rproj.user
+DESCRIPTION.orig
+
+# Cache
+/vignettes/*.html
+/vignettes/*.pdf
+inst/doc/
+
+# macOS
+.DS_Store
