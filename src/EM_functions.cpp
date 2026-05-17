@@ -1,16 +1,18 @@
 #include <RcppArmadillo.h>
+#include <string>
 using namespace Rcpp;
 
 // [[Rcpp::depends(RcppArmadillo)]]
 
 // double get_ll(arma::cube x, arma::mat mu, arma::cube sig, int R, int p, arma::uvec cl);
-double get_ll(arma::cube x, arma::mat mu, arma::cube sig, int R, int p, arma::mat z);
+double get_ll(arma::cube x, arma::mat mu, arma::cube sig, arma::cube A, int R, int p, arma::mat z);
+double log_f_k_observed(arma::mat xi, arma::rowvec mu, arma::mat Sigma, arma::mat A_i);
 double log_f_k(arma::mat xi, arma::rowvec mu, arma::mat sig, int R, int p);
 double f_k(arma::mat xi, arma::rowvec mu, arma::mat sig, int R, int p);
 double f(arma::mat xi, arma::vec pr, arma::mat mu, arma::cube sig, int R, int p, int K);
 arma::mat make_mask(arma::urowvec inds, int ncols);
 List em_step(arma::cube x, arma::mat mu, arma::cube Sigma,  arma::mat z, arma::vec pr, arma::vec cl,
-    arma::cube A, int n, int K, int R, int p, int iter);
+    arma::cube A, int n, int K, int R, int p, int iter, std::string constr);
 
 // function for obtaining the log-liklihood for the matrix-variate normal
 // distribution given a set of data, using a mixture model
@@ -18,20 +20,14 @@ List em_step(arma::cube x, arma::mat mu, arma::cube Sigma,  arma::mat z, arma::v
 // double get_ll(arma::cube x, arma::mat mu, arma::cube sig, int R, int p, arma::uvec cl) {
 //' @export
 // [[Rcpp::export]]
-double get_ll(arma::cube x, arma::mat mu, arma::cube sig, int R, int p, arma::mat z) {
+double get_ll(arma::cube x, arma::mat mu, arma::cube sig, arma::cube A, int R, int p, arma::mat z) {
   arma::uword n = x.n_slices;
   double ll = 0.0;
- 
-  // Uncomment the next 4 lines for the alternative calculation. Necessary on occasion for precesion when calculating LL or BIC
-  // for (arma::uword i = 0; i < n; i++) {
-  //   int ind_max = z.row(i).index_max();
-  //   ll += log_f_k(x.slice(i), mu.row(ind_max), sig.slice(ind_max), R, p);
-  // }
 
-  // Comment the next 3 lines for alternative calculation
-  for (arma::uword i = 0; i < n; i++)
-    ll += log(f(x.slice(i), arma::conv_to<arma::colvec>::from(z.row(i)), mu, sig, R, p, sig.n_slices));
-  ll += n * log(pow(2.0 * M_PI, -2*R*p)); // for precision. 
+  for (arma::uword i = 0; i < n; i++) {
+    int ind_max = z.row(i).index_max();
+    ll += log_f_k_observed(x.slice(i), mu.row(ind_max), sig.slice(ind_max), A.slice(i));
+  }
 
   return ll;
 }
@@ -43,13 +39,13 @@ double f_k(arma::mat xi, arma::rowvec mu, arma::mat sig, int R, int p) {
   arma::mat M(R, p, arma::fill::zeros);
   M.each_row() += mu;
 
-  // arma::mat sig_inv = arma::inv_sympd(arma::symmatu(sig));
+  // see reasoning for re-inserting this below
+  if (!sig.is_sympd())
+    sig.diag() += 1e-4;
+
   arma::mat sig_inv = arma::inv(sig);
   quad_trace = arma::trace((xi - M) * sig_inv * (xi - M).t());
 
-  // result = pow(2.0*M_PI, -2*R*p) * pow(exp(arma::log_det_sympd(arma::symmatu(sig))), -0.5*p) * exp(-0.5*quad_trace);
-  // NOTE: here the power is being removed to be added later, because of some
-  // computational probelms
   result = pow(exp(arma::log_det_sympd(arma::symmatu(sig))), -0.5*p) * exp(-0.5*quad_trace);
 
   return result;
@@ -68,21 +64,46 @@ double f(arma::mat xi, arma::vec pr, arma::mat mu, arma::cube sig, int R, int p,
 // [[Rcpp::export]]
 double log_f_k(arma::mat xi, arma::rowvec mu, arma::mat sig, int R, int p) {
   // mean matrix
-  // TODO: is there a better way to create a matrix that has identical rows?
-  //       perhaps one way is to create wiht identical columns and transpose it.
-  /* arma::mat M = arma::vec(R, arma::fill::ones) * mu.t(); */
   arma::mat M(R, p, arma::fill::zeros);
   M.each_row() += mu;
 
-  arma::mat sig_inv = arma::inv_sympd(arma::symmatu(sig));
+  // it is quite important here that this condition is met, as assigning result
+  // to a double requires the use of log_det_sympd()
+  if (!sig.is_sympd())
+    sig.diag() += 1e-4;
+
+  arma::mat sig_inv = arma::inv(sig);
 
   double quad_trace = arma::trace((xi - M) * sig_inv * (xi - M).t());
 
-  double result = (-R * p * 0.5) * std::log(2.0 * M_PI) +
-    (-p * 0.5) * arma::log_det_sympd(arma::symmatu(sig)) +
-    (-0.5 * quad_trace);
+  double result = (-R * p * 0.5) * std::log(2.0 * M_PI) + (-p * 0.5) * arma::log_det_sympd(arma::symmatu(sig)) + (-0.5 * quad_trace);
 
   return result;
+}
+
+double log_f_k_observed(arma::mat xi, arma::rowvec mu, arma::mat Sigma, arma::mat A_i) {
+  int R = xi.n_rows;
+  double ll = 0.0;
+
+  for (int r = 0; r < R; r++) {
+    arma::uvec obs_r = arma::find(A_i.row(r) < 0.5);
+    if (obs_r.is_empty()) continue;
+
+    int d = obs_r.n_elem;
+    arma::rowvec xi_r = xi.row(r);
+    arma::vec x_sub  = xi_r.elem(obs_r);
+    arma::vec mu_sub = mu.elem(obs_r);
+    arma::mat S_sub  = Sigma.submat(obs_r, obs_r);
+
+    if (!S_sub.is_sympd())
+      S_sub.diag() += 1e-4;
+
+    arma::vec diff = x_sub - mu_sub;
+    ll += -0.5 * d * std::log(2.0 * M_PI)
+        - 0.5 * arma::log_det_sympd(S_sub)
+        - 0.5 * arma::dot(diff, arma::solve(S_sub, diff));
+  }
+  return ll;
 }
 
 arma::mat make_mask(arma::urowvec inds, int ncols) {
@@ -108,7 +129,8 @@ List em_step(
   int K,             // number of clusters
   int R,             // number of rows in data
   int p,             // number of columns in data
-  int iter           // iteration number
+  int iter,          // iteration number
+  std::string constr // constrain on covariances
 ) {
 
   // loop variables
@@ -138,25 +160,28 @@ List em_step(
 
   double ll, bic;
 
-  // (E step)
-  //   update class memebership probabilities,
-  //   to be used for caculating conditional expectations
-  for (i = 0; i < n; i++) {
-    for (k = 0; k < K; k++) {
-      z(i, k) = pr(k) * f_k(x.slice(i), mu.row(k), Sigma.slice(k), R, p);
-      S.slice(k) = arma::kron(Sigma.slice(k), I);
-    }
-  }
-  // NOTE: is there a precision problem here?
+  // precompute Kronecker products needed for M-step imputation
+  for (k = 0; k < K; k++)
+    S.slice(k) = arma::kron(Sigma.slice(k), I);
 
-  z = arma::normalise(z, 1, 1);
+  // E step: compute log responsibilities using observed-data likelihood,
+  // then normalize row-wise via log-sum-exp for numerical stability
+  arma::mat log_z(n, K);
+  for (i = 0; i < n; i++) {
+    for (k = 0; k < K; k++)
+      log_z(i, k) = std::log(pr(k)) + log_f_k_observed(x.slice(i), mu.row(k), Sigma.slice(k), A.slice(i));
+    double lse = log_z.row(i).max() + std::log(arma::sum(arma::exp(log_z.row(i) - log_z.row(i).max())));
+    z.row(i) = arma::exp(log_z.row(i) - lse);
+  }
 
   // M step
   for (k = 0; k < K; k++) {
     acc.zeros();
-    sacc.zeros();
     M.zeros();
     M.each_row() += mu.row(k);
+
+    if (constr == "VVV" || constr == "VII" || k == 0)
+      sacc.zeros();
 
     den = arma::sum(z.col(k));
 
@@ -172,12 +197,12 @@ List em_step(
       for (j = 0; j < K; j++) {
         m_k.zeros();
         m_k.each_row() += mu.row(j);
-        x.slice(i).elem(miss) += z(i, j) * (m_k.elem(miss) + S.slice(j).submat(miss, nmiss) * arma::inv_sympd(arma::symmatu(S.slice(j).submat(nmiss, nmiss))) * (x.slice(i).elem(nmiss) - m_k.elem(nmiss)));
+        x.slice(i).elem(miss) += z(i, j) * (m_k.elem(miss) + S.slice(j).submat(miss, nmiss) * arma::inv(S.slice(j).submat(nmiss, nmiss)) * (x.slice(i).elem(nmiss) - m_k.elem(nmiss)));
       }
 
       // conditional variance of the missing portion of x_i given the observed
       // portion. used to calculate E(X'X) in covariance estimation
-      Phi = S.slice(k).submat(miss, miss) - S.slice(k).submat(miss, nmiss) * arma::inv_sympd(arma::symmatu(S.slice(k).submat(nmiss, nmiss))) * S.slice(k).submat(nmiss, miss);
+      Phi = S.slice(k).submat(miss, miss) - S.slice(k).submat(miss, nmiss) * arma::inv(S.slice(k).submat(nmiss, nmiss)) * S.slice(k).submat(nmiss, miss);
 
       acc += z(i, k) * arma::mean(x.slice(i), 0);
       diff = x.slice(i) - M;
@@ -194,15 +219,47 @@ List em_step(
     }
 
     mu.row(k) = acc / den;
-    Sigma.slice(k) = sacc / (R * den);
     pr(k) = den / n;
+
+    if (constr == "VVV") {
+      Sigma.slice(k) = sacc / (R * den);
+      // relax some conditions
+      if (!Sigma.slice(k).is_sympd())
+        Sigma.slice(k).diag() += 1e-6;
+    } else if ( constr == "VII" ) {
+      Sigma.slice(k) = arma::diagmat(sacc / (R * den));
+    }
+  }
+
+  if (constr == "EEE") {
+    for (k = 0; k < K; k++) {
+      Sigma.slice(k) = sacc / (R * n);
+      // relax some conditions
+      if (!Sigma.slice(k).is_sympd())
+        Sigma.slice(k).diag() += 1e-6;
+    }
+  } else if (constr == "EII") {
+    for (k = 0; k < K; k++) {
+      Sigma.slice(k) = arma::diagmat(sacc / (R * n));
+      // relax some conditions
+      if (!Sigma.slice(k).is_sympd())
+        Sigma.slice(k).diag() += 1e-6;
+    }
   }
 
   // assign "hard" clusters
   cl = arma::index_max(z, 1);
 
-  ll = get_ll(x, mu, Sigma, R, p, z);
-  bic = -2 * ll + log(n) * (K + K*p + K*p*(p + 1)/2);
+  ll = get_ll(x, mu, Sigma, A, R, p, z);
+
+  if (constr == "VVV")
+    bic = -2 * ll + log(n) * (K + K*p + K*p*(p + 1)/2);
+  else if (constr == "VII")
+    bic = -2 * ll + log(n) * (K + K*p + K*p);
+  else if (constr == "EEE")
+    bic = -2 * ll + log(n) * (K + K*p + p*(p + 1)/2);
+  else if (constr == "EII")
+    bic = -2 * ll + log(n) * (K + K*p + p);
 
   return List::create(
       Named("x") = x,

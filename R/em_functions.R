@@ -1,30 +1,30 @@
 #' Gaussian mixture models for replicated data
 #'
-#' A function to fit a finite mixture model of Gaussian distributions on 
+#' A function to fit a finite mixture model of Gaussian distributions on
 #' replicated data. The data are not required to have an equal number of
 #' replicates for each observation, or each feature within each observation.
-#' 
+#'
 #' A single observation may be of the form:
 #' \preformatted{
 #'   x_i11, x_i21, x_i31, x_i41
 #'   x_i12,   -  , x_i31, x_i41
-#'   x_i13,   -  , x_i31,   -  
-#'     -  ,   -  , x_i31,   -  
+#'   x_i13,   -  , x_i31,   -
+#'     -  ,   -  , x_i31,   -
 #' }
 #'
 #' The finite mixture model assumes that if the the observations were fully
 #' observed (meaning all features had R available replicates), they follow the distribution
-#' 
+#'
 #' \deqn{
 #' X_i^* \sim \sum_{k=1}^K \pi_k f(X_i^*;\; \mu_k, \Sigma_k).
 #' }{X_i^* ~ sum_{k=1}^k pi_k * f(X_i^*; mu_k, Sigma_k).}
-#' 
+#'
 #' where \eqn{f}{f} is a matrix-variate normal distribution. The mean matrix has
 #' equal columns equal to \eqn{\mu_k}{mu_k}, column covariance equal to
-#' \eqn{\Sigma_k}{Sigma_k}, and identity row covariance. 
-#' 
+#' \eqn{\Sigma_k}{Sigma_k}, and identity row covariance.
+#'
 #' This inherently assumes that replicates are independent within each subject.
-#' 
+#'
 #' @param x The array of data to be clustered. Should have dimensions (R, p, n),
 #' where R is the maximum ' number of replicates, p is the dimensionality of the
 #' data, and n is the number of observations. See the output of
@@ -38,6 +38,10 @@
 #' "kmeans," ' which calls `kmeans()` on the first row of each observation,
 #' "random," which randomly ' assigns observations to clusters, or "emEM," which
 #' performs a specified number of short  initial EM runs specified in the
+#' @param sph logical indicating if the resulting covariance matrices should be
+#' spherical
+#' @param hom logical indicating if the resulting covariance matrices should
+#' homogeneous across clusters
 #' `emEM_args` parameter, or "given," which uses the inital ' parameters specified
 #' in `params`.
 #' @param params list of initial parameter values if `init == "given"`. The list should have values:
@@ -54,7 +58,7 @@
 #'   \item{`em_iter`}{The number of EM steps to conduct in each run}
 #'   \item{`nbest`}{The number of short runs to fully run. The returned solution will be the best of these runs.}
 #' }
-#' 
+#'
 #' @return A list with the following elements:
 #' \describe{
 #'   \item{`z`}{The matrix of class probabilities for each observation}
@@ -65,7 +69,7 @@
 #'   \item{`ll`}{The sequence evaluted log-likelihood values. The length is equal to the number of EM runs that were conducted.}
 #'   \item{`bic`}{The Bayesian information critereon associated with each of the values in `ll`}
 #' }
-#' 
+#'
 #' @export
 #'
 #' @examples
@@ -77,6 +81,8 @@ repclust <- function(
   iter_max = 101,
   tol = .001,
   init = "kmeans",
+  sph = FALSE,
+  hom = FALSE,
   params = NULL,
   emEM_args = list(
     nstarts = round(sqrt(nclusters * prod(dim(x)))),
@@ -96,6 +102,18 @@ repclust <- function(
     for (j in 1:p) {
       x[which(is.na(x[, j, i])), j, i] <- 0
     }
+  }
+
+  if (sph) {
+    if (hom)
+      sigma_constr <- "EII"
+    else
+      sigma_constr <- "VII"
+  } else {
+    if (hom)
+      sigma_constr <- "EEE"
+    else
+      sigma_constr <- "VVV"
   }
 
   # obtain initial solution using K-means on first replicate for each data point
@@ -139,13 +157,29 @@ repclust <- function(
     best_res <- rep(list(NA), emEM_args$nbest)
     cutoff <- -Inf
     for (i in seq_len(emEM_args$nstarts)) {
-      tmp <- repclust(
-        x,
-        nclusters,
-        iter_max = emEM_args$em_iter,
-        tol,
-        init = "kmeans"
-      )
+      # tmp <- repclust(
+      #   x,
+      #   nclusters,
+      #   iter_max = emEM_args$em_iter,
+      #   tol,
+      #   init = "kmeans"
+      # )
+
+      tmp <-
+        tryCatch({
+          repclust(
+            x,
+            nclusters,
+            iter_max = emEM_args$em_iter,
+            tol = tol,
+            init = "kmeans",
+            hom = hom,
+            sph = sph
+          )},
+          error = function(e) return(NA)
+        )
+
+      if (!is.list(tmp)) next
 
       if (i <= emEM_args$nbest) {
         best_res[[i]] <- tmp
@@ -178,18 +212,32 @@ repclust <- function(
           " clusters..."
         )
       )
-      tmp <- repclust(
-        x,
-        nclusters,
-        iter_max = iter_max,
-        tol = tol,
-        init = "given",
-        params = best_res[[i]]
-      )
+
+      tmp <-
+        tryCatch({
+          repclust(
+            x,
+            nclusters,
+            iter_max = iter_max,
+            tol = tol,
+            init = "given",
+            params = best_res[[i]],
+            hom = hom,
+            sph = sph
+          )},
+          error = function(e) return(NA)
+        )
+
+      if (!is.list(tmp)) {
+        message("\tEncountered error, skipping run.")
+        next
+      }
 
       if (tmp$ll[length(tmp$ll)] > best_long_ll) {
         best_long_ll <- tmp$ll[length(tmp$ll)]
         best_long_res <- tmp
+        best_long_res$ll <- c(best_res[[i]]$ll, tmp$ll)
+        best_long_res$bic <- c(best_res[[i]]$bic, tmp$bic)
       }
     }
 
@@ -217,12 +265,12 @@ repclust <- function(
     }
 
     cl <- apply(z, 1, which.max) - 1
-    # ll[1] <- get_ll(x, mu, Sigma, R, p, res$cluster - 1)
-    # TODO: bandaid
+
     z <- model.matrix(~ 0 + x, data.frame(x = factor(res$cluster))) |>
       as.data.frame() |>
       as.matrix()
-    ll[1] <- get_ll(x, mu, Sigma, R, p, z)
+
+    ll[1] <- get_ll(x, mu, Sigma, A, R, p, z)
   } else {
     mu <- params$mu
     Sigma <- params$Sigma
@@ -230,6 +278,7 @@ repclust <- function(
     pr <- params$pi
     cl <- params$class - 1
 
+    # ll[1] <- get_ll(x, mu, Sigma, R, p, z)
     ll[1] <- params$ll[length(params$ll)]
     bic[1] <- params$bic[length(params$bic)]
   }
@@ -243,17 +292,24 @@ repclust <- function(
 
   # EM loop
   for (iter in 1:iter_max) {
-    params <- em_step(x, mu, Sigma, z, pr, cl, A, n, K, R, p, iter)
+    new_params <- em_step(x, mu, Sigma, z, pr, cl, A, n, K, R, p, iter, sigma_constr)
 
-    mu <- params$mu
-    Sigma <- params$Sigma
-    z <- params$z
-    pr <- params$pr
-    cl <- params$cl
-    x <- params$x
+    # prevent oscillating likelihood when there are numerical issues
+    # if (ll[iter] > new_params$ll)
+    #   break
 
-    ll[iter + 1] <- params$ll
-    bic[iter + 1] <- params$bic
+    mu <- new_params$mu
+    Sigma <- new_params$Sigma
+    z <- new_params$z
+    pr <- new_params$pr
+    cl <- new_params$cl
+    x <- new_params$x
+
+    ll[iter + 1] <- new_params$ll
+    bic[iter + 1] <- new_params$bic
+
+    if (is.na(abs((ll[iter + 1] - ll[iter]) / ll[iter])))
+      print(ll)
 
     if (abs((ll[iter + 1] - ll[iter]) / ll[iter]) < tol) {
       break
