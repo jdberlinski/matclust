@@ -7,9 +7,9 @@ Observations are allowed to have an unequal number of observations, both between
 See `?repclust` for more information on the model, and `?generate_data` to see the expected format for data.
 
 ## Installation
-With `devtools` (or `remotes`):
+With `pak`:
 ```{r}
-devtools::install_github("jdberlinski/matclust)
+pak::pak("jdberlinski/matclust)
 ```
 
 ## Example usage
