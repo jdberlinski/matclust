@@ -258,9 +258,13 @@ repclust <- function(
 
     cl <- apply(z, 1, which.max) - 1
 
-    z <- model.matrix(~ 0 + x, data.frame(x = factor(res$cluster))) |>
-      as.data.frame() |>
-      as.matrix()
+    if (K == 1) {
+      z <- matrix(1, nrow = n, ncol = 1)
+    } else {
+      z <- model.matrix(~ 0 + x, data.frame(x = factor(res$cluster))) |>
+        as.data.frame() |>
+        as.matrix()
+    }
 
     ll[1] <- get_ll(x, mu, Sigma, A, R, p, z)
   } else {
