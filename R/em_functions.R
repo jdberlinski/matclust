@@ -313,7 +313,7 @@ repclust <- function(
   }
   ll <- ll[1:iter + 1]
   bic <- bic[1:iter + 1]
-  return(
+  structure(
     list(
       z = z,
       pi = pr,
@@ -322,7 +322,8 @@ repclust <- function(
       class = as.numeric(cl + 1),
       ll = ll,
       bic = bic
-    )
+    ),
+    class = "repclust"
   )
 }
 
