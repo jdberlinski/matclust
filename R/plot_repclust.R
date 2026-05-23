@@ -25,6 +25,9 @@ plot.repclust <- function(x, ...) {
   op <- par(mfrow = c(2, 2), mar = c(4, 4, 3, 1))
   on.exit(par(op))
 
+  if (any(par("pin") <= 0))
+    stop("Plot window is too small for a 2×2 layout. Please enlarge it and call plot() again.", call. = FALSE)
+
   K <- ncol(x$z)
   n <- nrow(x$z)
 
