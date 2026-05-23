@@ -6,6 +6,7 @@ Authors@R:
 Description: Finite mixture model for replicated data without discarding
     replicate information. There may be an unequal number of replicates between
     features of each observation, allowing for "jagged" observations.
+Depends: R (>= 4.1.0)
 License: GPL (>= 3)
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
