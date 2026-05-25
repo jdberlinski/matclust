@@ -1,11 +1,12 @@
 Package: matclust
 Title: Clustering for matrix-variate normal data with uneven replicates
-Version: 0.1.0
+Version: 0.1.0.9000
 Authors@R: 
     person("Josh", "Berlinski", , "jdberlinski@gmail.com", role = c("aut", "cre"))
 Description: Finite mixture model for replicated data without discarding
     replicate information. There may be an unequal number of replicates between
     features of each observation, allowing for "jagged" observations.
+Depends: R (>= 4.1.0)
 License: GPL (>= 3)
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
@@ -13,7 +14,10 @@ RoxygenNote: 7.3.2
 LinkingTo: 
     Rcpp (>= 1.1.1),
     RcppArmadillo (>= 15.2.3-1)
-Imports: 
+Imports:
     MASS,
     MixSim,
     Rcpp (>= 1.1.1)
+Suggests:
+    testthat (>= 3.0.0)
+Config/testthat/edition: 3
