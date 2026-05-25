@@ -27,3 +27,4 @@ inst/doc/
 
 # macOS
 .DS_Store
+tests/testthat/Rplots.pdf
