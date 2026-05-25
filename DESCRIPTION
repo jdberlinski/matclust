@@ -1,5 +1,5 @@
 Package: matclust
-Title: Clustering for matrix-variate normal data with uneven replicates
+Title: Clustering for Matrix-Variate Normal Data with Uneven Replicates
 Version: 0.1.1.9000
 Authors@R: 
     person("Josh", "Berlinski", , "jdberlinski@gmail.com", role = c("aut", "cre"))
@@ -10,7 +10,6 @@ Depends: R (>= 4.1.0)
 License: GPL (>= 3)
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
-RoxygenNote: 7.3.2
 LinkingTo: 
     Rcpp (>= 1.1.1),
     RcppArmadillo (>= 15.2.3-1)
@@ -21,3 +20,4 @@ Imports:
 Suggests:
     testthat (>= 3.0.0)
 Config/testthat/edition: 3
+Config/roxygen2/version: 8.0.0
