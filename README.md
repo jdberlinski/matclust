@@ -1,3 +1,5 @@
+[![R-CMD-check](https://github.com/jdberlinski/matclust/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/jdberlinski/matclust/actions/workflows/R-CMD-check.yaml)
+
 # Clustering observations with unequal replicates.
 
 The function `repclust()` is used to cluster observations via a finite mixture of matrix-variate normal distributions.
@@ -9,7 +11,7 @@ See `?repclust` for more information on the model, and `?generate_data` to see t
 ## Installation
 With `pak`:
 ```{r}
-pak::pak("jdberlinski/matclust)
+pak::pak("jdberlinski/matclust")
 ```
 
 ## Example usage
