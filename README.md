@@ -1,4 +1,5 @@
 [![R-CMD-check](https://github.com/jdberlinski/matclust/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/jdberlinski/matclust/actions/workflows/R-CMD-check.yaml)
+[![codecov](https://codecov.io/gh/jdberlinski/matclust/graph/badge.svg)](https://codecov.io/gh/jdberlinski/matclust)
 
 # Clustering observations with unequal replicates.
 
