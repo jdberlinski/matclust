@@ -1,0 +1,3 @@
+coverage:
+  ignore:
+    - "R/RcppExports.R"

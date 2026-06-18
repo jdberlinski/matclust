@@ -10,6 +10,8 @@ repclust(
   iter_max = 101,
   tol = 0.001,
   init = "kmeans",
+  sph = FALSE,
+  hom = FALSE,
   params = NULL,
   emEM_args = list(nstarts = round(sqrt(nclusters * prod(dim(x)))), em_iter = 1, nbest =
     10)
@@ -32,7 +34,13 @@ terminates}
 \item{init}{string corresponding to the initialization method. Options are
 "kmeans," ' which calls \code{kmeans()} on the first row of each observation,
 "random," which randomly ' assigns observations to clusters, or "emEM," which
-performs a specified number of short  initial EM runs specified in the
+performs a specified number of short  initial EM runs specified in the}
+
+\item{sph}{logical indicating if the resulting covariance matrices should be
+spherical}
+
+\item{hom}{logical indicating if the resulting covariance matrices should
+homogeneous across clusters
 \code{emEM_args} parameter, or "given," which uses the inital ' parameters specified
 in \code{params}.}
 
@@ -74,8 +82,8 @@ A single observation may be of the form:
 \preformatted{
   x_i11, x_i21, x_i31, x_i41
   x_i12,   -  , x_i31, x_i41
-  x_i13,   -  , x_i31,   -  
-    -  ,   -  , x_i31,   -  
+  x_i13,   -  , x_i31,   -
+    -  ,   -  , x_i31,   -
 }
 
 The finite mixture model assumes that if the the observations were fully

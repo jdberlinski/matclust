@@ -71,6 +71,7 @@
 #' }
 #'
 #' @export
+#' @importFrom stats kmeans model.matrix
 #'
 #' @examples
 #' simulated_data <- generate_data(1000, 4, 10, 0.2)
@@ -79,7 +80,7 @@ repclust <- function(
   x,
   nclusters,
   iter_max = 101,
-  tol = .001,
+  tol = 0.001,
   init = "kmeans",
   sph = FALSE,
   hom = FALSE,
@@ -125,7 +126,7 @@ repclust <- function(
     pr <- res$size / sum(res$size)
   } else if (init == "random") {
     res <- list()
-    res$cluster <- sample(1:nclusters, n, replace = T)
+    res$cluster <- sample(1:nclusters, n, replace = TRUE)
     mu <- matrix(0, nrow = K, ncol = p)
     for (k in 1:K) {
       mu[k, ] <- colMeans(firstx[res$cluster == k, ])

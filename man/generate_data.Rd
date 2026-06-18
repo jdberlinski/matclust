@@ -40,6 +40,11 @@ fully observed data) to be present for each cluster}
 
 \item{rep_prob}{Vector of probabilities for each value of min_reps:max_reps
 to occur in each observation}
+
+\item{method}{Character string controlling how missing replicates are
+introduced. \code{"random"} (default) drops replicates from the end of the
+generated draws; \code{"lowest"} drops the replicates with the smallest values
+for each dimension.}
 }
 \value{
 A list, containing an array of data with observations on the 3rd axis

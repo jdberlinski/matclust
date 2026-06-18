@@ -1,6 +1,7 @@
 # R package build artifacts
 *.tar.gz
 *.zip
+*.Rcheck/
 
 # Compiled source files
 *.o

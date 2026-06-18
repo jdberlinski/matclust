@@ -1,6 +1,6 @@
 #' Diagnostic plots for a repclust fit
 #'
-#' Displays a 2×2 grid of model-fit diagnostics that do not require access to
+#' Displays a 2x2 grid of model-fit diagnostics that do not require access to
 #' the original (potentially multi-dimensional) data:
 #' \enumerate{
 #'   \item EM log-likelihood trace
@@ -16,6 +16,8 @@
 #'
 #' @method plot repclust
 #' @export
+#' @importFrom graphics par barplot text hist abline image axis box
+#' @importFrom grDevices grey.colors
 #'
 #' @examples
 #' sim <- generate_data(200, 3, 4, 0.2)
@@ -26,7 +28,7 @@ plot.repclust <- function(x, ...) {
   on.exit(par(op))
 
   if (any(par("pin") <= 0))
-    stop("Plot window is too small for a 2×2 layout. Please enlarge it and call plot() again.", call. = FALSE)
+    stop("Plot window is too small for a 2x2 layout. Please enlarge it and call plot() again.", call. = FALSE)
 
   K <- ncol(x$z)
   n <- nrow(x$z)

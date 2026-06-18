@@ -12,6 +12,10 @@
 #' fully observed data) to be present for each cluster
 #' @param rep_prob Vector of probabilities for each value of min_reps:max_reps
 #' to occur in each observation
+#' @param method Character string controlling how missing replicates are
+#'   introduced. `"random"` (default) drops replicates from the end of the
+#'   generated draws; `"lowest"` drops the replicates with the smallest values
+#'   for each dimension.
 #' @return A list, containing an array of data with observations on the 3rd axis
 #' and a vector of class memberships
 #' @export
@@ -31,9 +35,9 @@ generate_data <- function(n, K, p, gom, min_reps = 1, max_reps = 6, int = c(-5, 
   if (min_reps == max_reps) {
     n_reps <- matrix(max_reps, nrow = n, ncol = p)
   } else {
-    n_reps <- matrix(sample(min_reps:max_reps, n*p, prob = rep_prob, replace = T), nrow = n)
+    n_reps <- matrix(sample(min_reps:max_reps, n*p, prob = rep_prob, replace = TRUE), nrow = n)
   }
-  classes <- sample(1:K, n, prob = mix_prob, replace = T)
+  classes <- sample(1:K, n, prob = mix_prob, replace = TRUE)
   n_each <- table(classes)
   X <- Reduce(c, Map(
      function(i) {

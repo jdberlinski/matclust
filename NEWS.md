@@ -1,3 +1,7 @@
+# matclust 0.1.2
+
+* Minor fixes.
+
 # matclust 0.1.1
 
 * Added `plot.repclust()` S3 method for diagnostic plots.

@@ -18,7 +18,7 @@ List em_step(arma::cube x, arma::mat mu, arma::cube Sigma,  arma::mat z, arma::v
 // distribution given a set of data, using a mixture model
 //
 // double get_ll(arma::cube x, arma::mat mu, arma::cube sig, int R, int p, arma::uvec cl) {
-//' @export
+//' @keywords internal
 // [[Rcpp::export]]
 double get_ll(arma::cube x, arma::mat mu, arma::cube sig, arma::cube A, int R, int p, arma::mat z) {
   arma::uword n = x.n_slices;
