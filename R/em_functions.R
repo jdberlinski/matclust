@@ -80,7 +80,7 @@ repclust <- function(
   x,
   nclusters,
   iter_max = 101,
-  tol = .001,
+  tol = 0.001,
   init = "kmeans",
   sph = FALSE,
   hom = FALSE,
