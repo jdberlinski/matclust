@@ -1,6 +1,6 @@
 Package: matclust
 Title: Clustering for Matrix-Variate Normal Data with Uneven Replicates
-Version: 0.1.1.9000
+Version: 0.1.2
 Authors@R: 
     person("Josh", "Berlinski", , "jdberlinski@gmail.com", role = c("aut", "cre"))
 Description: Finite mixture model for replicated data without discarding
